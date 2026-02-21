@@ -1458,7 +1458,7 @@ const App = () => {
   const [portion, setPortion] = useState(2)
   const [mealTime, setMealTime] = useState(() => formatTimeInput(new Date()))
   const [mealDate, setMealDate] = useState(() => formatDateKey(new Date()))
-  const [inputMode, setInputMode] = useState<'lista' | 'ia'>('lista')
+  const [inputMode, setInputMode] = useState<'lista' | 'ia'>('ia')
   const [aiDescription, setAiDescription] = useState('')
   const [aiEstimate, setAiEstimate] = useState<OpenAIEstimate | null>(null)
   const [isLoadingAi, setIsLoadingAi] = useState(false)
@@ -1477,6 +1477,10 @@ const App = () => {
   const [toast, setToast] = useState<Toast | null>(null)
   const [librarySearch, setLibrarySearch] = useState('')
   const [libraryCategory, setLibraryCategory] = useState<FoodCategory | 'Todas'>('Todas')
+  const [libraryExpanded, setLibraryExpanded] = useState(false)
+  useEffect(() => {
+    setLibraryExpanded(false)
+  }, [librarySearch, libraryCategory])
   const [customFood, setCustomFood] = useState({
     name: '',
     category: 'Otros' as FoodCategory,
@@ -3238,16 +3242,6 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                 {/* Selector de modo */}
                 <div className="mt-4 flex gap-2">
                   <button
-                    onClick={() => setInputMode('lista')}
-                    className={`flex-1 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                      inputMode === 'lista'
-                        ? 'bg-sage-500 text-white'
-                        : 'bg-sage-100 text-sage-600 dark:bg-sage-800 dark:text-sage-300'
-                    }`}
-                  >
-                    📋 Buscar en lista
-                  </button>
-                  <button
                     onClick={() => setInputMode('ia')}
                     className={`flex-1 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                       inputMode === 'ia'
@@ -3256,6 +3250,16 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                     }`}
                   >
                     🤖 Describir con IA
+                  </button>
+                  <button
+                    onClick={() => setInputMode('lista')}
+                    className={`flex-1 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                      inputMode === 'lista'
+                        ? 'bg-sage-500 text-white'
+                        : 'bg-sage-100 text-sage-600 dark:bg-sage-800 dark:text-sage-300'
+                    }`}
+                  >
+                    📋 Buscar en lista
                   </button>
                 </div>
 
@@ -4523,7 +4527,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                   </select>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {libraryFoods.map((food) => (
+                  {(libraryExpanded ? libraryFoods : libraryFoods.slice(0, 15)).map((food) => (
                     <div
                       key={food.id}
                       className="rounded-2xl border border-sage-100 bg-white/80 p-4 shadow-soft dark:border-sage-800 dark:bg-sage-900/80"
@@ -4558,6 +4562,17 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                     </div>
                   ))}
                 </div>
+                {libraryFoods.length > 15 && (
+                  <div className="mt-3 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setLibraryExpanded((e) => !e)}
+                      className="rounded-full border border-sage-200 bg-white/80 px-4 py-2 text-sm font-medium text-sage-600 shadow-soft hover:bg-sage-100 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-300 dark:hover:bg-sage-800"
+                    >
+                      {libraryExpanded ? 'Ver menos' : `Ver más (${libraryFoods.length - 15} más)`}
+                    </button>
+                  </div>
+                )}
                 {libraryFoods.length === 0 && (
                   <EmptyState emoji="🔍" title="Ningún alimento coincide" description="Probá con otras palabras o agregá uno nuevo desde Biblioteca. Tu base crece con vos." />
                 )}
@@ -5260,17 +5275,6 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
               <div className="mb-3 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setInputMode('lista')}
-                  className={`flex-1 rounded-2xl px-3 py-2 text-xs font-semibold transition ${
-                    inputMode === 'lista'
-                      ? 'bg-sage-500 text-white'
-                      : 'bg-sage-100 text-sage-600 dark:bg-sage-800 dark:text-sage-300'
-                  }`}
-                >
-                  📋 Buscar en lista
-                </button>
-                <button
-                  type="button"
                   onClick={() => setInputMode('ia')}
                   className={`flex-1 rounded-2xl px-3 py-2 text-xs font-semibold transition ${
                     inputMode === 'ia'
@@ -5279,6 +5283,17 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                   }`}
                 >
                   🤖 Describir con IA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode('lista')}
+                  className={`flex-1 rounded-2xl px-3 py-2 text-xs font-semibold transition ${
+                    inputMode === 'lista'
+                      ? 'bg-sage-500 text-white'
+                      : 'bg-sage-100 text-sage-600 dark:bg-sage-800 dark:text-sage-300'
+                  }`}
+                >
+                  📋 Buscar en lista
                 </button>
               </div>
 
