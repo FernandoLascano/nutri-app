@@ -997,9 +997,10 @@ const loadState = (): AppState => {
 const saveState = (
   state: AppState,
   userId?: string,
-  options?: { onError?: (message: string) => void }
+  options?: { onError?: (message: string) => void; skipSupabase?: boolean }
 ) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  if (options?.skipSupabase) return
   const supabase = getSupabase()
   if (supabase && userId) {
     supabase
@@ -1442,6 +1443,7 @@ const App = () => {
   const pullStartY = useRef(0)
   const pullDistanceRef = useRef(0)
   const hydrationReminderShown = useRef(false)
+  const initialLoadDoneRef = useRef(false)
   const waterGlassesRef = useRef(state.waterGlasses)
   waterGlassesRef.current = state.waterGlasses
   const [activeProgresoSubTab, setActiveProgresoSubTab] = useState<'peso' | 'composicion' | 'analisis'>('peso')
@@ -1668,6 +1670,7 @@ const App = () => {
   useEffect(() => {
     const supabase = getSupabase()
     if (supabase && authUser) {
+      initialLoadDoneRef.current = false
       if (refreshTrigger > 0) setIsRefreshing(true)
       void Promise.resolve(
         supabase
@@ -1706,7 +1709,10 @@ const App = () => {
               } catch { /* ignore */ }
             }
           })
-      ).finally(() => setIsRefreshing(false))
+      ).finally(() => {
+        initialLoadDoneRef.current = true
+        setIsRefreshing(false)
+      })
     } else if (supabase && !authUser) {
       // En pantalla de login no cargamos estado
     } else if (!supabase) {
@@ -1719,8 +1725,10 @@ const App = () => {
   }, [authUser, refreshTrigger])
 
   useEffect(() => {
+    const skipSupabase = !!authUser && !initialLoadDoneRef.current
     saveState(state, authUser?.id, {
-      onError: (msg) => setToast({ id: randomId(), message: msg })
+      onError: (msg) => setToast({ id: randomId(), message: msg }),
+      skipSupabase
     })
     document.documentElement.classList.toggle('dark', state.theme === 'dark')
   }, [state, authUser?.id])
@@ -2902,7 +2910,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                   theme: prev.theme === 'light' ? 'dark' : 'light'
                 }))
               }
-              title={state.theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+              title=""
               aria-label={state.theme === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'}
               className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-sage-200 bg-white/80 text-sage-700 transition hover:-translate-y-0.5 hover:shadow-soft dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-200 sm:h-11 sm:w-11"
             >
@@ -2921,16 +2929,16 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
               <button
                 type="button"
                 onClick={handleSignOut}
-                title="Cerrar sesión"
+                title=""
                 aria-label="Cerrar sesión"
-                className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-sage-200 bg-white/80 text-sage-600 transition hover:bg-sage-100 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-300 dark:hover:bg-sage-800 sm:h-11 sm:w-auto sm:min-w-0 sm:shrink-0 sm:px-3 sm:pr-4 sm:gap-1.5 sm:rounded-full"
+                className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-sage-200 bg-white/80 text-sage-600 transition hover:bg-sage-100 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-300 dark:hover:bg-sage-800 md:h-11 md:w-auto md:min-w-0 md:shrink-0 md:px-3 md:pr-4 md:gap-1.5 md:rounded-full"
               >
-                <svg className="h-5 w-5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="h-5 w-5 md:h-4 md:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <polyline points="16 17 21 12 16 7" />
                   <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
-                <span className="hidden sm:inline text-xs font-medium">Salir</span>
+                <span className="hidden md:inline text-xs font-medium">Salir</span>
               </button>
             )}
           </div>
