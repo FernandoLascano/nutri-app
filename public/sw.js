@@ -1,7 +1,7 @@
-const CACHE_NAME = 'nutriaura-v1';
+const CACHE_NAME = 'nutri-app-v2';
+// No cachear index.html: cada deploy genera nuevo HTML con chunks distintos; cachearlo causa 404 del JS
 const urlsToCache = [
   '/',
-  '/index.html',
   '/manifest.json'
 ];
 
@@ -10,7 +10,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('NutriAura: Cache opened');
+        console.log('Nutr.io: Cache opened');
         return cache.addAll(urlsToCache);
       })
   );
@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('NutriAura: Removing old cache', cacheName);
+            console.log('Nutr.io: Removing old cache', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -44,34 +44,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
+
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then((response) => {
-          // Don't cache if not a valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+    // Para el documento HTML: siempre red, no usar caché (cada deploy cambia los scripts)
+    isDocument
+      ? fetch(event.request).catch(() => caches.match('/'))
+      : caches.match(event.request).then((response) => {
+          if (response) return response;
+          return fetch(event.request).then((response) => {
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
             return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        });
-      })
-      .catch(() => {
-        // Return offline page if available
-        return caches.match('/');
-      })
+          });
+        }).catch(() => caches.match('/'))
   );
 });
