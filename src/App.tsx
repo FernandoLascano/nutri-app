@@ -1550,14 +1550,34 @@ const App = () => {
       setAuthLoading(false)
       return
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthUser(session?.user ?? null)
+    // Timeout por si getSession nunca responde (red, URL/key incorrecta)
+    const timeout = setTimeout(() => {
+      setAuthUser(null)
       setAuthLoading(false)
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthUser(session?.user ?? null)
-    })
-    return () => subscription.unsubscribe()
+    }, 8000)
+    supabase.auth.getSession().then(
+      ({ data: { session } }) => {
+        setAuthUser(session?.user ?? null)
+        setAuthLoading(false)
+      },
+      () => {
+        setAuthUser(null)
+        setAuthLoading(false)
+      }
+    ).finally(() => clearTimeout(timeout))
+    let subscription: { unsubscribe: () => void } | null = null
+    try {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        setAuthUser(session?.user ?? null)
+      })
+      subscription = data.subscription
+    } catch {
+      // ignore
+    }
+    return () => {
+      clearTimeout(timeout)
+      subscription?.unsubscribe()
+    }
   }, [])
 
   // ¿Es admin? (solo cuando hay usuario)
@@ -2563,15 +2583,49 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
   }
 
   const supabase = getSupabase()
-  if (supabase && authLoading) {
+
+  // Sin Supabase (ej. Vercel sin variables): pedir configurar para ver login y guardar datos
+  if (!supabase) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-sage-50 dark:bg-sage-950">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-sage-500 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-sage-50 p-4 dark:bg-sage-950">
+        <div className="w-full max-w-md rounded-3xl border border-sage-200 bg-white p-6 shadow-soft dark:border-sage-700 dark:bg-sage-900">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-500 text-white">
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+                <path d="M5 13c5-8 12-9 14-8-1 6-5 12-13 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h1 className="font-display text-xl font-semibold text-sage-900 dark:text-sage-100">Nutr.io</h1>
+          </div>
+          <h2 className="mb-2 font-semibold text-sage-800 dark:text-sage-200">Configurá Supabase para el login</h2>
+          <p className="mb-4 text-sm text-sage-600 dark:text-sage-400">
+            En este despliegue no están definidas las variables de Supabase, por eso ves la app sin pantalla de login.
+          </p>
+          <p className="mb-4 text-sm text-sage-600 dark:text-sage-400">
+            En tu proyecto de Vercel (o donde despliegues), agregá las variables de entorno:
+          </p>
+          <ul className="mb-4 list-inside list-disc space-y-1 text-sm text-sage-700 dark:text-sage-300">
+            <li><code className="rounded bg-sage-100 px-1 dark:bg-sage-800">VITE_SUPABASE_URL</code></li>
+            <li><code className="rounded bg-sage-100 px-1 dark:bg-sage-800">VITE_SUPABASE_ANON_KEY</code></li>
+          </ul>
+          <p className="text-xs text-sage-500 dark:text-sage-400">
+            Valores en tu proyecto Supabase → Settings → API. Después volvé a desplegar.
+          </p>
+        </div>
       </div>
     )
   }
 
-  if (supabase && !authUser) {
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-sage-100 dark:bg-sage-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-sage-600 border-t-transparent dark:border-sage-400" />
+        <p className="text-sm text-sage-600 dark:text-sage-400">Cargando...</p>
+      </div>
+    )
+  }
+
+  if (!authUser) {
     const card = (
       <div className="w-full max-w-sm rounded-3xl border border-sage-200 bg-white p-6 shadow-soft dark:border-sage-700 dark:bg-sage-900">
         <div className="mb-6 flex items-center gap-3">
