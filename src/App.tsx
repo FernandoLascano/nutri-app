@@ -994,7 +994,11 @@ const loadState = (): AppState => {
   return getDefaultState()
 }
 
-const saveState = (state: AppState, userId?: string) => {
+const saveState = (
+  state: AppState,
+  userId?: string,
+  options?: { onError?: (message: string) => void }
+) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   const supabase = getSupabase()
   if (supabase && userId) {
@@ -1004,7 +1008,17 @@ const saveState = (state: AppState, userId?: string) => {
         { user_id: userId, state, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       )
-      .then(() => {}, () => {})
+      .then((result) => {
+        if (result.error) {
+          options?.onError?.(
+            'No se pudo guardar en la nube. En Supabase, ejecutá la migración de la tabla app_state_users.'
+          )
+        }
+      }, () => {
+        options?.onError?.(
+          'No se pudo guardar en la nube. Revisá la tabla app_state_users y RLS en Supabase.'
+        )
+      })
   } else if (supabase && !userId) {
     supabase
       .from('app_state')
@@ -1661,7 +1675,14 @@ const App = () => {
           .select('state')
           .eq('user_id', authUser.id)
           .single()
-          .then(({ data }) => {
+          .then(({ data, error }) => {
+            if (error && error.code !== 'PGRST116') {
+              setToast({
+                id: randomId(),
+                message:
+                  'No se pudo cargar desde la nube. En Supabase ejecutá la migración app_state_users y revisá RLS.'
+              })
+            }
             if (data?.state && typeof data.state === 'object') {
               setState(mergeParsedState(data.state as Partial<AppState>))
             } else {
@@ -1673,12 +1694,17 @@ const App = () => {
               }
             }
           }, () => {
+            setToast({
+              id: randomId(),
+              message:
+                'Error al conectar con la nube. Revisá la tabla app_state_users en Supabase.'
+            })
             const saved = localStorage.getItem(STORAGE_KEY)
             if (saved) {
               try {
                 setState(mergeParsedState(JSON.parse(saved) as Partial<AppState>))
               } catch { /* ignore */ }
-              }
+            }
           })
       ).finally(() => setIsRefreshing(false))
     } else if (supabase && !authUser) {
@@ -1693,7 +1719,9 @@ const App = () => {
   }, [authUser, refreshTrigger])
 
   useEffect(() => {
-    saveState(state, authUser?.id)
+    saveState(state, authUser?.id, {
+      onError: (msg) => setToast({ id: randomId(), message: msg })
+    })
     document.documentElement.classList.toggle('dark', state.theme === 'dark')
   }, [state, authUser?.id])
 
