@@ -18,6 +18,11 @@ body {
   background-size: auto;
 }
 
+.dark body {
+  background-color: #1a2920;
+  color: #f6f9f6;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -49,6 +54,10 @@ body::before {
   background: radial-gradient(circle at 20% 10%, rgba(255, 236, 226, 0.6), transparent 45%), radial-gradient(circle at 80% 0%, rgba(214, 235, 221, 0.6), transparent 42%), radial-gradient(circle at 70% 80%, rgba(255, 217, 200, 0.4), transparent 45%);
   pointer-events: none;
   z-index: 0;
+}
+
+.dark body::before {
+  background: radial-gradient(ellipse at 20% 20%, rgba(56, 90, 70, 0.25), transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(38, 61, 49, 0.2), transparent 45%);
 }
 
 #root {

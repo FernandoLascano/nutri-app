@@ -916,10 +916,18 @@ const formatShortDate = (date: Date) =>
     month: 'short'
   })
 
+/** Fecha en formato DIA MES AÑO (ej: 20 febrero 2025) */
+const formatDateDisplay = (dateKey: string) => {
+  const d = new Date(dateKey + 'T12:00:00')
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/\s+de\s+/g, ' ')
+}
+
+/** Hora en 24h (ej: 14:30) */
 const formatTime = (date: Date) =>
   date.toLocaleTimeString('es-AR', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: false
   })
 
 const formatTimeInput = (date: Date) => date.toTimeString().slice(0, 5)
@@ -1026,7 +1034,8 @@ const buildMealEntry = (
   portion: number,
   customFoods: FoodItem[],
   note: string = '',
-  timeOverride?: string
+  timeOverride?: string,
+  dateOverride?: string
 ): MealEntry => {
   const food = findFood(name, customFoods)
   const scale = portionScale[portion - 1] ?? 1
@@ -1036,7 +1045,7 @@ const buildMealEntry = (
     name,
     mealType,
     time: timeOverride ?? formatTime(new Date()),
-    date: formatDateKey(new Date()),
+    date: dateOverride ?? formatDateKey(new Date()),
     portion,
     calories: Math.round((food?.calories ?? 280) * scale),
     protein: Math.round((food?.protein ?? 12) * scale),
@@ -1432,6 +1441,7 @@ const App = () => {
   const [selectedMealType, setSelectedMealType] = useState<MealType>(() => getMealTypeForCurrentTime(defaultFastingProtocol))
   const [portion, setPortion] = useState(2)
   const [mealTime, setMealTime] = useState(() => formatTimeInput(new Date()))
+  const [mealDate, setMealDate] = useState(() => formatDateKey(new Date()))
   const [inputMode, setInputMode] = useState<'lista' | 'ia'>('lista')
   const [aiDescription, setAiDescription] = useState('')
   const [aiEstimate, setAiEstimate] = useState<OpenAIEstimate | null>(null)
@@ -1743,10 +1753,8 @@ const App = () => {
     .filter((meal) => meal.date === todayKey)
     .sort((a, b) => a.time.localeCompare(b.time))
 
-  // IF-aware meal types: hide Desayuno/Media mañana when IF is active
-  const activeMealTypes = state.fastingProtocol.enabled
-    ? mealTypes.filter(t => t !== 'Desayuno' && t !== 'Media mañana')
-    : mealTypes
+  // Todos los tipos siempre (aunque hagas IF a veces desayunás)
+  const activeMealTypes = mealTypes
 
   const recentMeals = state.meals
     .slice()
@@ -2056,7 +2064,7 @@ const App = () => {
 
   const handleAddMeal = () => {
     if (!mealName.trim()) return
-    const entry = buildMealEntry(mealName.trim(), selectedMealType, portion, state.customFoods, mealNote.trim(), mealTime)
+    const entry = buildMealEntry(mealName.trim(), selectedMealType, portion, state.customFoods, mealNote.trim(), mealTime, mealDate)
     setState((prev) => ({
       ...prev,
       meals: [entry, ...prev.meals]
@@ -2064,6 +2072,7 @@ const App = () => {
     setMealName('')
     setMealNote('')
     setMealTime(formatTimeInput(new Date()))
+    setMealDate(formatDateKey(new Date()))
     setToast({ id: randomId(), message: '¡Registro guardado con éxito!' })
     setShowRegisterCheck(true)
   }
@@ -2120,7 +2129,7 @@ const App = () => {
       name: aiDescription.trim(),
       mealType: selectedMealType,
       time: mealTime,
-      date: formatDateKey(new Date()),
+      date: mealDate,
       portion,
       calories: Math.round(aiEstimate.calories * scale),
       protein: Math.round(aiEstimate.protein * scale),
@@ -2136,6 +2145,7 @@ const App = () => {
     setAiDescription('')
     setAiEstimate(null)
     setMealTime(formatTimeInput(new Date()))
+    setMealDate(formatDateKey(new Date()))
     setToast({ id: randomId(), message: '¡Comida registrada con estimación IA!' })
     setShowRegisterCheck(true)
   }
@@ -2838,7 +2848,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
               </p>
             </div>
           </div>
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-shrink flex-wrap items-center justify-end gap-2 sm:gap-3">
             {authUser && (
               <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs text-sage-600 shadow-soft dark:bg-sage-900/80 dark:text-sage-300 sm:text-sm" title={authUser.email ?? ''}>
                 {authUser.email?.split('@')[0] ?? 'Usuario'}
@@ -2864,17 +2874,35 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                   theme: prev.theme === 'light' ? 'dark' : 'light'
                 }))
               }
-              className="min-h-[44px] touch-manipulation rounded-full border border-sage-200 bg-white/80 px-3 py-2 text-xs font-medium text-sage-700 transition hover:-translate-y-0.5 hover:shadow-soft dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-200 sm:px-4 sm:text-sm"
+              title={state.theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+              aria-label={state.theme === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'}
+              className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-sage-200 bg-white/80 text-sage-700 transition hover:-translate-y-0.5 hover:shadow-soft dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-200 sm:h-11 sm:w-11"
             >
-              {state.theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+              {state.theme === 'light' ? (
+                <svg className="h-5 w-5 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5 sm:h-5 sm:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+              )}
             </button>
             {authUser && (
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="min-h-[44px] touch-manipulation rounded-full border border-sage-200 bg-white/80 px-3 py-2 text-xs font-medium text-sage-600 transition hover:bg-sage-100 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-300 sm:px-4 sm:text-sm"
+                title="Cerrar sesión"
+                aria-label="Cerrar sesión"
+                className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-sage-200 bg-white/80 text-sage-600 transition hover:bg-sage-100 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-300 dark:hover:bg-sage-800 sm:h-11 sm:w-auto sm:min-w-0 sm:shrink-0 sm:px-3 sm:pr-4 sm:gap-1.5 sm:rounded-full"
               >
-                Cerrar sesión
+                <svg className="h-5 w-5 sm:h-4 sm:w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span className="hidden sm:inline text-xs font-medium">Salir</span>
               </button>
             )}
           </div>
@@ -3254,14 +3282,25 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         ))}
                       </div>
                     </div>
-                    <div>
-                      <label className="text-xs text-sage-500">Horario</label>
-                      <input
-                        type="time"
-                        value={mealTime}
-                        onChange={(e) => setMealTime(e.target.value)}
-                        className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
-                      />
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-xs text-sage-500">Fecha (día mes año)</label>
+                        <input
+                          type="date"
+                          value={mealDate}
+                          onChange={(e) => setMealDate(e.target.value)}
+                          className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <label className="text-xs text-sage-500">Horario (24 h)</label>
+                        <input
+                          type="time"
+                          value={mealTime}
+                          onChange={(e) => setMealTime(e.target.value)}
+                          className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-sage-500">Nota (opcional)</label>
@@ -3301,6 +3340,11 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         {state.openaiApiKey ? 'Cambiar' : 'Configurar'}
                       </button>
                     </div>
+                    {authUser && (
+                      <p className="text-xs text-sage-500 dark:text-sage-400">
+                        Tus datos (API key, registros, metas) se guardan en tu cuenta y se sincronizan en todos tus dispositivos.
+                      </p>
+                    )}
 
                     <div>
                       <label className="text-xs text-sage-500">Describe lo que comiste</label>
@@ -3323,7 +3367,9 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       </div>
                     )}
 
-                    {aiEstimate && !isLoadingAi && (
+                    {aiEstimate && !isLoadingAi && (() => {
+                      const scale = portionScale[portion - 1] ?? 1
+                      return (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -3332,6 +3378,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-sage-700 dark:text-sage-200">
                             {state.openaiApiKey ? '🤖 Estimación OpenAI' : '📊 Estimación básica'}
+                            {portion !== 2 && <span className="ml-1 text-xs font-normal text-sage-500">(×{scale})</span>}
                           </span>
                           <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
                             aiEstimate.confidence === 'alta'
@@ -3345,23 +3392,23 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         </div>
                         <div className="mt-3 grid grid-cols-5 gap-2 text-center">
                           <div className="rounded-xl bg-white/80 p-2 dark:bg-sage-800/80">
-                            <p className="text-lg font-bold text-coral-600">{aiEstimate.calories}</p>
+                            <p className="text-lg font-bold text-coral-600">{Math.round(aiEstimate.calories * scale)}</p>
                             <p className="text-xs text-sage-500">kcal</p>
                           </div>
                           <div className="rounded-xl bg-white/80 p-2 dark:bg-sage-800/80">
-                            <p className="text-lg font-bold text-sage-600">{aiEstimate.protein}g</p>
+                            <p className="text-lg font-bold text-sage-600">{Math.round(aiEstimate.protein * scale)}g</p>
                             <p className="text-xs text-sage-500">Prot</p>
                           </div>
                           <div className="rounded-xl bg-white/80 p-2 dark:bg-sage-800/80">
-                            <p className="text-lg font-bold text-soil-600">{aiEstimate.carbs}g</p>
+                            <p className="text-lg font-bold text-soil-600">{Math.round(aiEstimate.carbs * scale)}g</p>
                             <p className="text-xs text-sage-500">Carbs</p>
                           </div>
                           <div className="rounded-xl bg-white/80 p-2 dark:bg-sage-800/80">
-                            <p className="text-lg font-bold text-coral-500">{aiEstimate.fat}g</p>
+                            <p className="text-lg font-bold text-coral-500">{Math.round(aiEstimate.fat * scale)}g</p>
                             <p className="text-xs text-sage-500">Grasas</p>
                           </div>
                           <div className="rounded-xl bg-white/80 p-2 dark:bg-sage-800/80">
-                            <p className="text-lg font-bold text-green-600">{aiEstimate.fiber}g</p>
+                            <p className="text-lg font-bold text-green-600">{Math.round(aiEstimate.fiber * scale)}g</p>
                             <p className="text-xs text-sage-500">Fibra</p>
                           </div>
                         </div>
@@ -3381,16 +3428,27 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                           </p>
                         )}
                       </motion.div>
-                    )}
+                    ); })()}
 
-                    <div>
-                      <label className="text-xs text-sage-500">Horario</label>
-                      <input
-                        type="time"
-                        value={mealTime}
-                        onChange={(e) => setMealTime(e.target.value)}
-                        className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
-                      />
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-xs text-sage-500">Fecha (día mes año)</label>
+                        <input
+                          type="date"
+                          value={mealDate}
+                          onChange={(e) => setMealDate(e.target.value)}
+                          className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <label className="text-xs text-sage-500">Horario (24 h)</label>
+                        <input
+                          type="time"
+                          value={mealTime}
+                          onChange={(e) => setMealTime(e.target.value)}
+                          className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="text-xs text-sage-500 w-full">Tipo de comida</span>
@@ -4100,7 +4158,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         <div key={entry.id} className="flex items-center justify-between rounded-2xl bg-white/80 px-4 py-2 text-sm shadow-soft dark:bg-sage-900/80">
                           <div>
                             <span className="font-medium">{entry.weight.toFixed(1)} kg</span>
-                            <span className="ml-2 text-xs text-sage-500">{entry.date}</span>
+                            <span className="ml-2 text-xs text-sage-500 capitalize">{formatDateDisplay(entry.date)}</span>
                             {entry.note && <span className="ml-2 text-xs text-sage-400">· {entry.note}</span>}
                           </div>
                           <button
@@ -4202,7 +4260,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         .map((entry) => (
                           <div key={entry.id} className="rounded-2xl bg-white/80 p-4 shadow-soft dark:bg-sage-900/80">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-sage-700 dark:text-sage-200">{entry.date}</span>
+                              <span className="text-sm font-medium text-sage-700 dark:text-sage-200 capitalize">{formatDateDisplay(entry.date)}</span>
                               <button
                                 onClick={() => handleDeleteBodyComp(entry.id)}
                                 className="text-xs text-coral-500 hover:text-coral-700"
@@ -4962,8 +5020,8 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       >
                         <div className="flex-1">
                           <p className="font-medium text-sage-800 dark:text-sage-100">{meal.name}</p>
-                          <p className="text-xs text-sage-500">
-                            {meal.date} · {meal.mealType} · {meal.time}
+                          <p className="text-xs text-sage-500 capitalize">
+                            {formatDateDisplay(meal.date)} · {meal.mealType} · {meal.time}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -5246,14 +5304,25 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       ))}
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-sage-500">Horario</label>
-                    <input
-                      type="time"
-                      value={mealTime}
-                      onChange={(e) => setMealTime(e.target.value)}
-                      className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
-                    />
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 min-w-0">
+                      <label className="text-xs text-sage-500">Fecha (día mes año)</label>
+                      <input
+                        type="date"
+                        value={mealDate}
+                        onChange={(e) => setMealDate(e.target.value)}
+                        className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label className="text-xs text-sage-500">Horario (24 h)</label>
+                      <input
+                        type="time"
+                        value={mealTime}
+                        onChange={(e) => setMealTime(e.target.value)}
+                        className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-sage-500">Nota (opcional)</label>
@@ -5307,11 +5376,14 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       <span className="text-xs text-sage-600 dark:text-sage-300">Analizando con IA...</span>
                     </div>
                   )}
-                  {aiEstimate && !isLoadingAi && (
+                  {aiEstimate && !isLoadingAi && (() => {
+                    const scale = portionScale[portion - 1] ?? 1
+                    return (
                     <div className="rounded-2xl border border-sage-200 bg-sage-50/80 p-3 dark:border-sage-700 dark:bg-sage-900/80">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-sage-700 dark:text-sage-200">
                           {state.openaiApiKey ? '🤖 OpenAI' : '📊 Estimación'}
+                          {portion !== 2 && <span className="ml-1 font-normal text-sage-500">(×{scale})</span>}
                         </span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                           aiEstimate.confidence === 'alta' ? 'bg-green-100 text-green-700' : aiEstimate.confidence === 'media' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
@@ -5321,36 +5393,47 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       </div>
                       <div className="grid grid-cols-5 gap-1 text-center">
                         <div className="rounded-lg bg-white/80 p-1.5 dark:bg-sage-800/80">
-                          <p className="text-sm font-bold text-coral-600">{aiEstimate.calories}</p>
+                          <p className="text-sm font-bold text-coral-600">{Math.round(aiEstimate.calories * scale)}</p>
                           <p className="text-[10px] text-sage-500">kcal</p>
                         </div>
                         <div className="rounded-lg bg-white/80 p-1.5 dark:bg-sage-800/80">
-                          <p className="text-sm font-bold text-sage-600">{aiEstimate.protein}g</p>
+                          <p className="text-sm font-bold text-sage-600">{Math.round(aiEstimate.protein * scale)}g</p>
                           <p className="text-[10px] text-sage-500">P</p>
                         </div>
                         <div className="rounded-lg bg-white/80 p-1.5 dark:bg-sage-800/80">
-                          <p className="text-sm font-bold text-soil-600">{aiEstimate.carbs}g</p>
+                          <p className="text-sm font-bold text-soil-600">{Math.round(aiEstimate.carbs * scale)}g</p>
                           <p className="text-[10px] text-sage-500">C</p>
                         </div>
                         <div className="rounded-lg bg-white/80 p-1.5 dark:bg-sage-800/80">
-                          <p className="text-sm font-bold text-coral-500">{aiEstimate.fat}g</p>
+                          <p className="text-sm font-bold text-coral-500">{Math.round(aiEstimate.fat * scale)}g</p>
                           <p className="text-[10px] text-sage-500">G</p>
                         </div>
                         <div className="rounded-lg bg-white/80 p-1.5 dark:bg-sage-800/80">
-                          <p className="text-sm font-bold text-green-600">{aiEstimate.fiber}g</p>
+                          <p className="text-sm font-bold text-green-600">{Math.round(aiEstimate.fiber * scale)}g</p>
                           <p className="text-[10px] text-sage-500">Fib</p>
                         </div>
                       </div>
                     </div>
-                  )}
-                  <div>
-                    <label className="text-xs text-sage-500">Horario</label>
-                    <input
-                      type="time"
-                      value={mealTime}
-                      onChange={(e) => setMealTime(e.target.value)}
-                      className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
-                    />
+                  ); })()}
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 min-w-0">
+                      <label className="text-xs text-sage-500">Fecha (día mes año)</label>
+                      <input
+                        type="date"
+                        value={mealDate}
+                        onChange={(e) => setMealDate(e.target.value)}
+                        className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label className="text-xs text-sage-500">Horario (24 h)</label>
+                      <input
+                        type="time"
+                        value={mealTime}
+                        onChange={(e) => setMealTime(e.target.value)}
+                        className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <span className="text-xs text-sage-500 w-full">Tipo de comida</span>
