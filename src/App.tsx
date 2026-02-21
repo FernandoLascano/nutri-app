@@ -2864,7 +2864,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
           </div>
         </div>
       )}
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 sm:gap-6 px-3 pb-20 pt-4 sm:px-4 sm:pb-12 sm:pt-6 md:px-8">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 sm:gap-6 px-3 pb-20 pt-[max(1rem,env(safe-area-inset-top))] sm:px-4 sm:pb-12 sm:pt-6 md:px-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sage-500 text-white shadow-soft sm:h-12 sm:w-12 sm:rounded-2xl">
@@ -3142,13 +3142,13 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                     {fastingTime.isFasting ? '🔒' : '🍽️'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-semibold ${
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className={`text-xs font-semibold shrink-0 ${
                         fastingTime.isFasting ? 'text-coral-600' : 'text-sage-600 dark:text-sage-300'
                       }`}>
                         IF 16:8 · {fastingTime.label}
                       </span>
-                      <span className="text-xs text-sage-400">
+                      <span className="text-xs text-sage-400 whitespace-nowrap">
                         ({state.fastingProtocol.eatingWindowStart}-{state.fastingProtocol.eatingWindowEnd})
                       </span>
                     </div>
@@ -3318,8 +3318,8 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         ))}
                       </div>
                     </div>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1 min-w-0">
+                    <div className="grid grid-cols-1 gap-3 sm:flex sm:gap-2 sm:items-end">
+                      <div className="min-w-0">
                         <label className="text-xs text-sage-500">Fecha (día mes año)</label>
                         <input
                           type="date"
@@ -3328,7 +3328,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                           className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
                         />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0">
                         <label className="text-xs text-sage-500">Horario (24 h)</label>
                         <input
                           type="time"
@@ -3466,8 +3466,8 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       </motion.div>
                     ); })()}
 
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1 min-w-0">
+                    <div className="grid grid-cols-1 gap-3 sm:flex sm:gap-2 sm:items-end">
+                      <div className="min-w-0">
                         <label className="text-xs text-sage-500">Fecha (día mes año)</label>
                         <input
                           type="date"
@@ -3476,7 +3476,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                           className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
                         />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0">
                         <label className="text-xs text-sage-500">Horario (24 h)</label>
                         <input
                           type="time"
@@ -5340,8 +5340,8 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       ))}
                     </div>
                   </div>
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1 min-w-0">
+                  <div className="grid grid-cols-1 gap-3 sm:flex sm:gap-2 sm:items-end">
+                    <div className="min-w-0">
                       <label className="text-xs text-sage-500">Fecha (día mes año)</label>
                       <input
                         type="date"
@@ -5350,7 +5350,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
                       />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0">
                       <label className="text-xs text-sage-500">Horario (24 h)</label>
                       <input
                         type="time"
@@ -5451,8 +5451,8 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                       </div>
                     </div>
                   ); })()}
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1 min-w-0">
+                  <div className="grid grid-cols-1 gap-3 sm:flex sm:gap-2 sm:items-end">
+                    <div className="min-w-0">
                       <label className="text-xs text-sage-500">Fecha (día mes año)</label>
                       <input
                         type="date"
@@ -5461,7 +5461,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                         className="mt-1 h-[42px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
                       />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0">
                       <label className="text-xs text-sage-500">Horario (24 h)</label>
                       <input
                         type="time"
