@@ -125,12 +125,8 @@ type ActivityCategory =
   | 'Caminata'
   | 'Running'
   | 'Yoga'
-  | 'Ciclismo'
   | 'Fuerza'
   | 'Pilates'
-  | 'HIIT'
-  | 'Natación'
-  | 'Baile'
   | 'Otro'
 
 type FastingProtocol = {
@@ -750,12 +746,8 @@ const activityCategories: { id: ActivityCategory; label: string; emoji: string; 
   { id: 'Caminata', label: 'Caminata', emoji: '🚶‍♀️', tone: 'bg-sage-100 text-sage-700' },
   { id: 'Running', label: 'Running', emoji: '🏃‍♂️', tone: 'bg-coral-100 text-coral-700' },
   { id: 'Yoga', label: 'Yoga', emoji: '🧘‍♀️', tone: 'bg-sage-100 text-sage-700' },
-  { id: 'Ciclismo', label: 'Ciclismo', emoji: '🚴‍♀️', tone: 'bg-coral-100 text-coral-700' },
   { id: 'Fuerza', label: 'Fuerza', emoji: '💪', tone: 'bg-soil-100 text-soil-700' },
   { id: 'Pilates', label: 'Pilates', emoji: '🧘‍♂️', tone: 'bg-sage-100 text-sage-700' },
-  { id: 'HIIT', label: 'HIIT', emoji: '⚡', tone: 'bg-coral-100 text-coral-700' },
-  { id: 'Natación', label: 'Natación', emoji: '🏊‍♀️', tone: 'bg-sage-100 text-sage-700' },
-  { id: 'Baile', label: 'Baile', emoji: '💃', tone: 'bg-soil-100 text-soil-700' },
   { id: 'Otro', label: 'Otro', emoji: '✨', tone: 'bg-sage-100 text-sage-700' }
 ]
 
@@ -3317,6 +3309,7 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
               transition={{ duration: 0.3 }}
               className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr_0.8fr]"
             >
+              <div className="flex flex-col gap-6">
               <div className={`${cardBase} p-6 relative overflow-hidden scroll-mt-[max(1.25rem,env(safe-area-inset-top))]`}>
                 <img
                   src={cornerSpark}
@@ -3640,6 +3633,144 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                 </datalist>
               </div>
 
+                {/* Registrar actividad física + Pasos - debajo de Registro rápido */}
+                <div className={`${cardBase} p-6`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-sage-700 dark:text-sage-200">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-sage-100 text-sage-600 dark:bg-sage-800 dark:text-sage-200">
+                        💪
+                      </span>
+                      Registrar actividad física
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activityCategories.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => setActivityForm((prev) => ({ ...prev, category: category.id }))}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          activityForm.category === category.id
+                            ? 'bg-sage-500 text-white'
+                            : 'bg-sage-100 text-sage-600 hover:bg-sage-200 dark:bg-sage-800 dark:text-sage-300'
+                        }`}
+                      >
+                        <span className="mr-1">{category.emoji}</span>
+                        {category.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-sage-500">Detalle</label>
+                      <input
+                        value={activityForm.name}
+                        onChange={(event) => setActivityForm((prev) => ({ ...prev, name: event.target.value }))}
+                        placeholder="Ej: 5K suave"
+                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-sage-500">Minutos</label>
+                      <input
+                        type="number"
+                        min={10}
+                        max={240}
+                        step={5}
+                        value={activityForm.minutes}
+                        onChange={(event) =>
+                          setActivityForm((prev) => ({ ...prev, minutes: Number(event.target.value) }))
+                        }
+                        placeholder="30"
+                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-sage-500">Horario</label>
+                      <input
+                        type="time"
+                        value={activityForm.time}
+                        onChange={(event) => setActivityForm((prev) => ({ ...prev, time: event.target.value }))}
+                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {(['Suave', 'Moderada', 'Alta'] as ActivityEntry['intensity'][]).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => setActivityForm((prev) => ({ ...prev, intensity: level }))}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          activityForm.intensity === level
+                            ? 'bg-coral-500 text-white'
+                            : 'bg-coral-100 text-coral-700 dark:bg-coral-200 dark:bg-coral-900 dark:text-coral-200'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                    <button
+                      onClick={handleAddActivity}
+                      className="ml-auto rounded-full bg-sage-600 px-4 py-1.5 text-xs font-semibold text-white shadow-soft hover:bg-sage-700"
+                    >
+                      Guardar actividad
+                    </button>
+                  </div>
+                  {state.activities.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-sage-500">
+                      <span>Últimas:</span>
+                      {state.activities.slice(0, 3).map((activity) => (
+                        <button
+                          key={activity.id}
+                          onClick={() => setEditingActivity(activity)}
+                          className="rounded-full bg-sage-100 px-2 py-1 text-sage-700 hover:bg-sage-200 dark:bg-sage-800 dark:text-sage-300"
+                          title="Click para editar"
+                        >
+                          {activity.category} · {activity.minutes} min ✏️
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t border-sage-200/60 dark:border-sage-700/60">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">👟</span>
+                      <span className="text-sm font-semibold text-sage-700 dark:text-sage-200">Pasos del día</span>
+                      {todaySteps > 0 && (
+                        <span className="ml-auto text-xs font-semibold text-sage-500">{todaySteps.toLocaleString()} pasos</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={stepsInput}
+                        onChange={(e) => setStepsInput(e.target.value)}
+                        placeholder="Pasos (ej: 8500)"
+                        className="flex-1 rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
+                      />
+                      <button
+                        onClick={handleAddSteps}
+                        className="rounded-full bg-sage-600 px-4 py-1.5 text-xs font-semibold text-white shadow-soft hover:bg-sage-700"
+                      >
+                        Guardar
+                      </button>
+                    </div>
+                    {todaySteps > 0 && (
+                      <div className="mt-2">
+                        <div className="h-1.5 rounded-full bg-sage-200/60 dark:bg-sage-800">
+                          <div
+                            className={`h-1.5 rounded-full transition-all duration-500 ${todaySteps >= 8000 ? 'bg-sage-500' : 'bg-sage-300'}`}
+                            style={{ width: `${Math.min(100, (todaySteps / 10000) * 100)}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-sage-400">{Math.min(100, Math.round((todaySteps / 10000) * 100))}% de meta (10.000 pasos)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-6">
                 {/* Hidratación en página de registro */}
                 <div className={`${cardBase} p-6`}>
@@ -3726,144 +3857,6 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                       ))}
                     </div>
                   )}
-                </div>
-
-                {/* Acceso rápido - Actividad física */}
-                <div className={`${cardBase} p-6`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-sage-700 dark:text-sage-200">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-sage-100 text-sage-600 dark:bg-sage-800 dark:text-sage-200">
-                        💪
-                      </span>
-                      Registrar actividad física
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {activityCategories.map((category) => (
-                      <button
-                        key={category.id}
-                        onClick={() => setActivityForm((prev) => ({ ...prev, category: category.id }))}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                          activityForm.category === category.id
-                            ? 'bg-sage-500 text-white'
-                            : 'bg-sage-100 text-sage-600 hover:bg-sage-200 dark:bg-sage-800 dark:text-sage-300'
-                        }`}
-                      >
-                        <span className="mr-1">{category.emoji}</span>
-                        {category.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <div>
-                      <label className="mb-1 block text-xs text-sage-500">Detalle</label>
-                      <input
-                        value={activityForm.name}
-                        onChange={(event) => setActivityForm((prev) => ({ ...prev, name: event.target.value }))}
-                        placeholder="Ej: 5K suave"
-                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-sage-500">Minutos</label>
-                      <input
-                        type="number"
-                        min={10}
-                        max={240}
-                        step={5}
-                        value={activityForm.minutes}
-                        onChange={(event) =>
-                          setActivityForm((prev) => ({ ...prev, minutes: Number(event.target.value) }))
-                        }
-                        placeholder="30"
-                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-sage-500">Horario</label>
-                      <input
-                        type="time"
-                        value={activityForm.time}
-                        onChange={(event) => setActivityForm((prev) => ({ ...prev, time: event.target.value }))}
-                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {(['Suave', 'Moderada', 'Alta'] as ActivityEntry['intensity'][]).map((level) => (
-                      <button
-                        key={level}
-                        onClick={() => setActivityForm((prev) => ({ ...prev, intensity: level }))}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                          activityForm.intensity === level
-                            ? 'bg-coral-500 text-white'
-                            : 'bg-coral-100 text-coral-700 hover:bg-coral-200 dark:bg-coral-900 dark:text-coral-200'
-                        }`}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                    <button
-                      onClick={handleAddActivity}
-                      className="ml-auto rounded-full bg-sage-600 px-4 py-1.5 text-xs font-semibold text-white shadow-soft hover:bg-sage-700"
-                    >
-                      Guardar actividad
-                    </button>
-                  </div>
-                  {state.activities.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-sage-500">
-                      <span>Últimas:</span>
-                      {state.activities.slice(0, 3).map((activity) => (
-                        <button
-                          key={activity.id}
-                          onClick={() => setEditingActivity(activity)}
-                          className="rounded-full bg-sage-100 px-2 py-1 text-sage-700 hover:bg-sage-200 dark:bg-sage-800 dark:text-sage-300"
-                          title="Click para editar"
-                        >
-                          {activity.category} · {activity.minutes} min ✏️
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Step Tracker */}
-                  <div className="mt-4 pt-4 border-t border-sage-200/60 dark:border-sage-700/60">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">👟</span>
-                      <span className="text-sm font-semibold text-sage-700 dark:text-sage-200">Pasos del día</span>
-                      {todaySteps > 0 && (
-                        <span className="ml-auto text-xs font-semibold text-sage-500">{todaySteps.toLocaleString()} pasos</span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={stepsInput}
-                        onChange={(e) => setStepsInput(e.target.value)}
-                        placeholder="Pasos (ej: 8500)"
-                        className="flex-1 rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
-                      />
-                      <button
-                        onClick={handleAddSteps}
-                        className="rounded-full bg-sage-600 px-4 py-1.5 text-xs font-semibold text-white shadow-soft hover:bg-sage-700"
-                      >
-                        Guardar
-                      </button>
-                    </div>
-                    {todaySteps > 0 && (
-                      <div className="mt-2">
-                        <div className="h-1.5 rounded-full bg-sage-200/60 dark:bg-sage-800">
-                          <div
-                            className={`h-1.5 rounded-full transition-all duration-500 ${todaySteps >= 8000 ? 'bg-sage-500' : 'bg-sage-300'}`}
-                            style={{ width: `${Math.min(100, (todaySteps / 10000) * 100)}%` }}
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-sage-400">{Math.min(100, Math.round((todaySteps / 10000) * 100))}% de meta (10.000 pasos)</p>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 {/* Weekly Activity Summary */}
