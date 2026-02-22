@@ -1529,10 +1529,13 @@ const App = () => {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   const [editingProfile, setEditingProfile] = useState(false)
-  const [assistantMode, setAssistantMode] = useState<'plan' | 'ingredients' | 'macros'>('plan')
+  const [assistantMode, setAssistantMode] = useState<'plan' | 'ingredients' | 'macros' | 'chat'>('chat')
   const [ingredientsInput, setIngredientsInput] = useState('')
   const [assistantResult, setAssistantResult] = useState<string>('')
   const [isLoadingAssistant, setIsLoadingAssistant] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [fastingTime, setFastingTime] = useState(() => getFastingStatus(defaultFastingProtocol))
   const [stepsInput, setStepsInput] = useState('')
   const [aiMotivational, setAiMotivational] = useState<{ daily: string; context: string; date: string } | null>(null)
@@ -2521,6 +2524,87 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
     setIsLoadingAssistant(false)
   }
 
+  const handleChatSend = async () => {
+    const text = chatInput.trim()
+    if (!text) return
+    const userMsg: { role: 'user' | 'assistant'; content: string } = { role: 'user', content: text }
+    setChatMessages((prev) => [...prev, userMsg])
+    setChatInput('')
+    setIsLoadingChat(true)
+
+    if (state.openaiApiKey) {
+      try {
+        const mealsTodaySummary = todaysMeals.length === 0
+          ? 'Aún no registró comidas hoy.'
+          : todaysMeals.map((m) => `- ${m.mealType} ${m.time}: ${m.name} (${m.calories} kcal, P:${m.protein}g C:${m.carbs}g G:${m.fat}g)`).join('\n')
+        const deficitCal = Math.max(0, state.goals.caloriesTarget - dailyTotals.calories)
+        const deficitP = Math.max(0, state.goals.proteinTarget - dailyTotals.protein)
+        const customFoodNames = state.customFoods.length === 0 ? 'Ninguno' : state.customFoods.slice(0, 30).map((f) => f.name).join(', ')
+        const lastWeight = state.weightHistory.length > 0
+          ? state.weightHistory.slice().sort((a, b) => b.date.localeCompare(a.date))[0]
+          : null
+        const activitiesToday = state.activities.filter((a) => a.date === todayKey)
+        const activitiesSummary = activitiesToday.length === 0 ? 'Ninguna registrada hoy.' : activitiesToday.map((a) => `${a.category} ${a.minutes} min`).join(', ')
+
+        const userContext = `
+Datos actuales del usuario (usá esto para razonar y dar respuestas personalizadas):
+
+- Fecha de hoy: ${todayKey}
+- Comidas registradas hoy: ${todaysMeals.length}
+${mealsTodaySummary}
+
+- Totales del día: ${dailyTotals.calories} kcal, ${dailyTotals.protein}g proteína, ${dailyTotals.carbs}g carbos, ${dailyTotals.fat}g grasas, ${dailyTotals.fiber}g fibra
+- Objetivos diarios: ${state.goals.caloriesTarget} kcal, ${state.goals.proteinTarget}g proteína, ${state.goals.carbsTarget}g carbos, ${state.goals.fatTarget}g grasas
+- Le faltan aprox: ${deficitCal} kcal, ${deficitP}g proteína para el objetivo de hoy
+- Vasos de agua hoy: ${state.waterGlasses}/8
+- Ayuno intermitente: IF 16:8, ventana ${state.fastingProtocol.eatingWindowStart}-${state.fastingProtocol.eatingWindowEnd}
+- Alimentos personalizados en su biblioteca: ${customFoodNames}
+${lastWeight ? `- Último peso registrado: ${lastWeight.weight} kg (${lastWeight.date})` : ''}
+- Actividad física hoy: ${activitiesSummary}
+`
+
+        const systemPrompt = `Sos un asistente de nutrición y alimentación en español. Ayudás con:
+- Comidas saludables, recetas y preparaciones
+- Nutrición, macros, calorías y planes alimentarios
+- Listas de supermercado y qué comprar
+- Ayuno intermitente y ventana alimentaria
+
+IMPORTANTE: Tenés acceso a la información que el usuario cargó en la app. Usala para razonar y dar respuestas personalizadas (qué le falta hoy, sugerir según lo que ya comió, recordar sus alimentos favoritos, etc.). Si pregunta por "hoy" o "mi día", referite a sus datos actuales.
+${userContext}
+
+Responde en español, de forma clara y práctica. Si pide lista de super, dala por categorías. Mantené respuestas concisas pero útiles.`
+
+        const messages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
+          { role: 'system', content: systemPrompt },
+          ...chatMessages.map((m) => ({ role: m.role, content: m.content })),
+          { role: 'user', content: text }
+        ]
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.openaiApiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages,
+            temperature: 0.7,
+            max_tokens: 800
+          })
+        })
+        const data = await response.json()
+        const reply = data.choices?.[0]?.message?.content ?? 'No pude generar una respuesta.'
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+      } catch {
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: 'Error al consultar. Verificá tu API Key de OpenAI o intentá de nuevo.' }])
+      }
+    } else {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Para usar el asistente de preguntas necesitás configurar tu API Key de OpenAI (Registro rápido > Describir con IA > Configurar).' }
+      ])
+    }
+    setIsLoadingChat(false)
+  }
+
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = getSupabase()
@@ -2873,7 +2957,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
           </div>
         </div>
       )}
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 sm:gap-6 px-3 pb-20 pt-[max(1rem,env(safe-area-inset-top))] sm:px-4 sm:pb-12 sm:pt-6 md:px-8">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 sm:gap-6 px-3 pb-32 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-4 sm:pb-12 sm:pt-6 md:px-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sage-500 text-white shadow-soft sm:h-12 sm:w-12 sm:rounded-2xl">
@@ -3233,7 +3317,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
               transition={{ duration: 0.3 }}
               className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr_0.8fr]"
             >
-              <div className={`${cardBase} p-6 relative overflow-hidden`}>
+              <div className={`${cardBase} p-6 relative overflow-hidden scroll-mt-[max(1.25rem,env(safe-area-inset-top))]`}>
                 <img
                   src={cornerSpark}
                   alt=""
@@ -3245,7 +3329,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                 </h2>
 
                 {/* Selector de modo */}
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex gap-2 min-h-[44px] items-center">
                   <button
                     onClick={() => setInputMode('ia')}
                     className={`flex-1 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
@@ -3864,8 +3948,9 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                 <p className="mt-1 text-xs text-sage-500">Te ayudo a decidir qué comer según tu plan, tus ingredientes o tus macros.</p>
 
                 {/* Mode selector */}
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   {([
+                    { id: 'chat' as const, label: '💬 Preguntas', color: 'coral' },
                     { id: 'plan' as const, label: '📋 Mi plan', color: 'sage' },
                     { id: 'ingredients' as const, label: '🥕 Ingredientes', color: 'coral' },
                     { id: 'macros' as const, label: '📊 Macros', color: 'soil' }
@@ -3873,7 +3958,7 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                     <button
                       key={mode.id}
                       onClick={() => setAssistantMode(mode.id)}
-                      className={`flex-1 rounded-2xl px-3 py-2 text-xs font-semibold transition ${
+                      className={`rounded-2xl px-3 py-2 text-xs font-semibold transition ${
                         assistantMode === mode.id
                           ? mode.color === 'sage' ? 'bg-sage-500 text-white'
                             : mode.color === 'coral' ? 'bg-coral-500 text-white'
@@ -3887,6 +3972,65 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                 </div>
 
                 {/* Mode A: Plan suggestions */}
+                {/* Mode: Chat / Preguntas */}
+                {assistantMode === 'chat' && (
+                  <div className="mt-4 flex flex-col gap-3">
+                    <p className="text-xs text-sage-500">
+                      Preguntá lo que quieras sobre comidas, nutrición, lista de super, recetas o tu plan.
+                    </p>
+                    <div className="flex flex-col gap-3 rounded-2xl border border-sage-200/60 bg-sage-50/50 p-3 dark:border-sage-700/60 dark:bg-sage-900/50 min-h-[200px] max-h-[320px] overflow-y-auto">
+                      {chatMessages.length === 0 && (
+                        <p className="text-center text-sm text-sage-500 py-4">
+                          Escribí una pregunta y tocá Enviar. Ej: &quot;¿Qué comprar para la semana?&quot;, &quot;Ideas para cenar liviano&quot;
+                        </p>
+                      )}
+                      {chatMessages.map((msg, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                              msg.role === 'user'
+                                ? 'bg-coral-500 text-white'
+                                : 'bg-white/90 text-sage-800 shadow-soft dark:bg-sage-800/90 dark:text-sage-100'
+                            }`}
+                          >
+                            <span className="whitespace-pre-wrap">{msg.content}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {isLoadingChat && (
+                        <div className="flex justify-start">
+                          <div className="rounded-2xl bg-white/90 px-4 py-2.5 text-sm text-sage-600 dark:bg-sage-800/90 dark:text-sage-300">
+                            <span className="flex items-center gap-2">
+                              <span className="h-3 w-3 animate-spin rounded-full border-2 border-coral-500 border-t-transparent" />
+                              Pensando...
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSend()}
+                        placeholder="Ej: Lista de super para la semana"
+                        className="flex-1 min-w-0 rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleChatSend}
+                        disabled={!chatInput.trim() || isLoadingChat}
+                        className="shrink-0 rounded-2xl bg-coral-500 px-4 py-2.5 text-sm font-semibold text-white shadow-soft hover:bg-coral-600 disabled:bg-sage-300 disabled:cursor-not-allowed dark:disabled:bg-sage-700"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {assistantMode === 'plan' && (() => {
                   const todayPlan = getTodayMealPlan()
                   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
