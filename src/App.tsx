@@ -906,8 +906,12 @@ const glass =
 
 const cardBase = glass
 
-const formatDateKey = (date: Date) =>
-  date.toISOString().split('T')[0] ?? ''
+const formatDateKey = (date: Date) => {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 const formatShortDate = (date: Date) =>
   date.toLocaleDateString('es-AR', {
@@ -2023,6 +2027,7 @@ const App = () => {
       prevTodayKeyRef.current = todayKey
       celebrationShownForDate.current = null
       prevCompletedRef.current = 0
+      setState((prev) => ({ ...prev, waterGlasses: 0 }))
     }
   }, [todayKey])
 
@@ -5630,18 +5635,27 @@ Responde en español, de forma concisa y práctica. Sugiere 2-3 opciones de comi
                     className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-sage-500">Tipo de comida</label>
+                  <select
+                    value={editingMeal.mealType}
+                    onChange={(e) => setEditingMeal({ ...editingMeal, mealType: e.target.value as MealType })}
+                    className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
+                  >
+                    {mealTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-sage-500">Tipo de comida</label>
-                    <select
-                      value={editingMeal.mealType}
-                      onChange={(e) => setEditingMeal({ ...editingMeal, mealType: e.target.value as MealType })}
+                    <label className="text-xs text-sage-500">Fecha</label>
+                    <input
+                      type="date"
+                      value={editingMeal.date}
+                      onChange={(e) => setEditingMeal({ ...editingMeal, date: e.target.value })}
                       className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
-                    >
-                      {mealTypes.map((type) => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-sage-500">Hora</label>
