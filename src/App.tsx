@@ -1453,6 +1453,7 @@ const App = () => {
 
   const [mealName, setMealName] = useState('')
   const [mealNote, setMealNote] = useState('')
+  const [mealOffDiet, setMealOffDiet] = useState(false)
   const [selectedMealType, setSelectedMealType] = useState<MealType>(() => getMealTypeForCurrentTime(defaultFastingProtocol))
   const [portion, setPortion] = useState(2)
   const [mealTime, setMealTime] = useState(() => formatTimeInput(new Date()))
@@ -2114,15 +2115,17 @@ const App = () => {
   const handleAddMeal = () => {
     if (!mealName.trim()) return
     const entry = buildMealEntry(mealName.trim(), selectedMealType, portion, state.customFoods, mealNote.trim(), mealTime, mealDate)
+    if (mealOffDiet) entry.offDiet = true
     setState((prev) => ({
       ...prev,
       meals: [entry, ...prev.meals]
     }))
     setMealName('')
     setMealNote('')
+    setMealOffDiet(false)
     setMealTime(formatTimeInput(new Date()))
     setMealDate(formatDateKey(new Date()))
-    setToast({ id: randomId(), message: '¡Registro guardado con éxito!' })
+    setToast({ id: randomId(), message: mealOffDiet ? '¡Registro guardado (fuera de dieta)!' : '¡Registro guardado con éxito!' })
     setShowRegisterCheck(true)
   }
 
@@ -2185,7 +2188,8 @@ const App = () => {
       carbs: Math.round(aiEstimate.carbs * scale),
       fat: Math.round(aiEstimate.fat * scale),
       fiber: Math.round(aiEstimate.fiber * scale),
-      note: `IA (${aiEstimate.confidence}): ${aiEstimate.detectedIngredients.join(', ')}${aiEstimate.reasoning ? ' - ' + aiEstimate.reasoning : ''}`
+      note: `IA (${aiEstimate.confidence}): ${aiEstimate.detectedIngredients.join(', ')}${aiEstimate.reasoning ? ' - ' + aiEstimate.reasoning : ''}`,
+      offDiet: mealOffDiet || undefined
     }
     setState((prev) => ({
       ...prev,
@@ -2193,9 +2197,10 @@ const App = () => {
     }))
     setAiDescription('')
     setAiEstimate(null)
+    setMealOffDiet(false)
     setMealTime(formatTimeInput(new Date()))
     setMealDate(formatDateKey(new Date()))
-    setToast({ id: randomId(), message: '¡Comida registrada con estimación IA!' })
+    setToast({ id: randomId(), message: mealOffDiet ? '¡Comida registrada (fuera de dieta)!' : '¡Comida registrada con estimación IA!' })
     setShowRegisterCheck(true)
   }
 
@@ -3774,12 +3779,26 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                         className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
                       />
                     </div>
-                    <button
-                      onClick={handleAddMeal}
-                      className="rounded-2xl bg-coral-500 px-6 py-3 text-sm font-semibold text-white shadow-soft hover:bg-coral-600"
-                    >
-                      Registrar comida
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setMealOffDiet(!mealOffDiet)}
+                        className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                          mealOffDiet
+                            ? 'border-red-300 bg-red-50 text-red-600 dark:border-red-700 dark:bg-red-950/30 dark:text-red-400'
+                            : 'border-sage-200 bg-white/80 text-sage-400 dark:border-sage-700 dark:bg-sage-800 dark:text-sage-500'
+                        }`}
+                        title={mealOffDiet ? 'Marcada fuera de dieta' : 'Marcar fuera de dieta'}
+                      >
+                        {mealOffDiet ? '⚠️ Fuera de dieta' : '✅'}
+                      </button>
+                      <button
+                        onClick={handleAddMeal}
+                        className="flex-1 rounded-2xl bg-coral-500 px-6 py-3 text-sm font-semibold text-white shadow-soft hover:bg-coral-600"
+                      >
+                        Registrar comida
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-4 grid gap-4">
@@ -3953,17 +3972,31 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                       </div>
                     </div>
 
-                    <button
-                      onClick={handleAddMealFromAi}
-                      disabled={!aiEstimate}
-                      className={`rounded-2xl px-6 py-3 text-sm font-semibold shadow-soft transition ${
-                        aiEstimate
-                          ? 'bg-coral-500 text-white hover:bg-coral-600'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      Registrar con estimación IA
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setMealOffDiet(!mealOffDiet)}
+                        className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                          mealOffDiet
+                            ? 'border-red-300 bg-red-50 text-red-600 dark:border-red-700 dark:bg-red-950/30 dark:text-red-400'
+                            : 'border-sage-200 bg-white/80 text-sage-400 dark:border-sage-700 dark:bg-sage-800 dark:text-sage-500'
+                        }`}
+                        title={mealOffDiet ? 'Marcada fuera de dieta' : 'Marcar fuera de dieta'}
+                      >
+                        {mealOffDiet ? '⚠️ Fuera de dieta' : '✅'}
+                      </button>
+                      <button
+                        onClick={handleAddMealFromAi}
+                        disabled={!aiEstimate}
+                        className={`flex-1 rounded-2xl px-6 py-3 text-sm font-semibold shadow-soft transition ${
+                          aiEstimate
+                            ? 'bg-coral-500 text-white hover:bg-coral-600'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        Registrar con estimación IA
+                      </button>
+                    </div>
                   </div>
                 )}
 
