@@ -5614,6 +5614,54 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                     ))}
                   </div>
                 </div>
+                {/* Activity History */}
+                <div className={`${cardBase} p-6`}>
+                  <h3 className="font-display text-lg font-semibold">
+                    <SectionTitle icon={<IconSpark />} text="Historial de actividad física" />
+                  </h3>
+                  {state.activities.length === 0 ? (
+                    <p className="mt-3 text-xs text-sage-400">No hay actividades registradas todavía.</p>
+                  ) : (
+                    <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                      {state.activities
+                        .slice()
+                        .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
+                        .slice(0, 20)
+                        .map((activity) => (
+                        <div
+                          key={activity.id}
+                          className="flex items-center justify-between rounded-2xl border border-sage-100 bg-white/80 px-4 py-2 text-sm shadow-soft dark:border-sage-800 dark:bg-sage-900/80"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-sage-800 dark:text-sage-100">
+                              {activity.name || activity.category}
+                            </p>
+                            <p className="text-xs text-sage-500">
+                              {formatDateDisplay(activity.date)} · {activity.time} · {activity.category} · {activity.intensity}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-soil-600">{activity.minutes} min</span>
+                            <button
+                              onClick={() => setEditingActivity(activity)}
+                              className="rounded-full p-1 text-sage-400 hover:bg-sage-100 hover:text-sage-600 dark:hover:bg-sage-800"
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => handleRemoveActivity(activity.id)}
+                              className="rounded-full p-1 text-sage-400 hover:bg-red-100 hover:text-red-600"
+                              title="Eliminar"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {/* PDF Export */}
                 <div className={`${cardBase} p-6`}>
                   <h3 className="font-display text-lg font-semibold">
