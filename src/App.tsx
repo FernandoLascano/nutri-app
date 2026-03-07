@@ -2646,6 +2646,145 @@ const App = () => {
       y = getY() + 10
     }
 
+    // ===== VISUAL ADHERENCE MAP =====
+    if (meals.length > 0) {
+      checkPage(80)
+      drawSectionHeader('Mapa de adherencia a la dieta', sage)
+
+      // Build all dates in range (not just dates with meals)
+      const allDates: string[] = []
+      const cur = new Date(from + 'T12:00:00')
+      const end = new Date(to + 'T12:00:00')
+      while (cur <= end) { allDates.push(formatDateKey(cur)); cur.setDate(cur.getDate() + 1) }
+
+      const boxSize = 9
+      const gap = 2.5
+      const labelW = 22
+      const startX = 14 + labelW
+      // Max meals per day to determine columns
+      const maxMealsPerDay = Math.max(...allDates.map(d => (mealsByDay[d] || []).length), 1)
+      const cols = Math.min(maxMealsPerDay, 8)
+      const rowH = boxSize + gap
+
+      // Legend
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(darkText[0], darkText[1], darkText[2])
+
+      doc.setFillColor(76, 175, 80)
+      doc.roundedRect(14, y, 8, 8, 1.5, 1.5, 'F')
+      doc.text('Dentro de dieta', 24, y + 6)
+
+      doc.setFillColor(229, 57, 53)
+      doc.roundedRect(62, y, 8, 8, 1.5, 1.5, 'F')
+      doc.text('Fuera de dieta', 72, y + 6)
+
+      doc.setFillColor(224, 224, 224)
+      doc.roundedRect(112, y, 8, 8, 1.5, 1.5, 'F')
+      doc.text('Sin registro', 122, y + 6)
+      y += 14
+
+      // Draw grid
+      for (const date of allDates) {
+        checkPage(rowH + 4)
+        const dayMeals = mealsByDay[date] || []
+        const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+
+        // Date label
+        doc.setFontSize(7)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(100, 110, 105)
+        doc.text(dayLabel, 14, y + boxSize - 2)
+
+        if (dayMeals.length === 0) {
+          // Empty day - gray box
+          doc.setFillColor(235, 238, 236)
+          doc.roundedRect(startX, y, boxSize, boxSize, 1.5, 1.5, 'F')
+          doc.setFontSize(5)
+          doc.setTextColor(180, 180, 180)
+          doc.text('-', startX + 3.5, y + 6)
+        } else {
+          // Draw one box per meal
+          for (let i = 0; i < dayMeals.length && i < cols; i++) {
+            const meal = dayMeals[i]
+            const x = startX + i * (boxSize + gap)
+            if (meal.offDiet) {
+              doc.setFillColor(229, 57, 53)
+            } else {
+              doc.setFillColor(76, 175, 80)
+            }
+            doc.roundedRect(x, y, boxSize, boxSize, 1.5, 1.5, 'F')
+
+            // Meal type initial inside box
+            doc.setFontSize(5.5)
+            doc.setFont('helvetica', 'bold')
+            doc.setTextColor(255, 255, 255)
+            const initial = meal.mealType[0]
+            doc.text(initial, x + boxSize / 2, y + boxSize / 2 + 1.5, { align: 'center' })
+          }
+
+          // If more meals than cols, show "+N"
+          if (dayMeals.length > cols) {
+            const x = startX + cols * (boxSize + gap)
+            doc.setFontSize(6)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(130, 140, 135)
+            doc.text(`+${dayMeals.length - cols}`, x, y + 6)
+          }
+        }
+
+        // Day summary on the right
+        if (dayMeals.length > 0) {
+          const dayTotal = dayMeals.reduce((s, m) => s + m.calories, 0)
+          const offCount = dayMeals.filter(m => m.offDiet).length
+          const summaryX = startX + cols * (boxSize + gap) + 12
+          doc.setFontSize(6.5)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(100, 110, 105)
+          doc.text(`${dayTotal} kcal`, summaryX, y + 4)
+          if (offCount > 0) {
+            doc.setTextColor(229, 57, 53)
+            doc.text(`${offCount} fuera`, summaryX, y + 8.5)
+          }
+        }
+
+        y += rowH
+      }
+
+      // Summary bar at bottom
+      y += 4
+      checkPage(16)
+      const totalMeals = meals.length
+      const onDiet = meals.filter(m => !m.offDiet).length
+      const offDiet = meals.filter(m => m.offDiet).length
+      const adherencePct = Math.round((onDiet / Math.max(1, totalMeals)) * 100)
+
+      // Background bar
+      const barW = pageW - 28
+      const barH = 10
+      doc.setFillColor(235, 238, 236)
+      doc.roundedRect(14, y, barW, barH, 3, 3, 'F')
+      // Green portion
+      if (onDiet > 0) {
+        const greenW = Math.max(6, (onDiet / totalMeals) * barW)
+        doc.setFillColor(76, 175, 80)
+        doc.roundedRect(14, y, greenW, barH, 3, 3, 'F')
+      }
+      // Red portion (at the end)
+      if (offDiet > 0) {
+        const redW = Math.max(6, (offDiet / totalMeals) * barW)
+        doc.setFillColor(229, 57, 53)
+        doc.roundedRect(14 + barW - redW, y, redW, barH, 3, 3, 'F')
+      }
+      // Label on bar
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255)
+      doc.text(`${adherencePct}% adherencia (${onDiet}/${totalMeals} comidas dentro de dieta)`, pageW / 2, y + barH / 2 + 2, { align: 'center' })
+
+      y += barH + 10
+    }
+
     // ===== FOOTER on every page =====
     const totalPages = doc.getNumberOfPages()
     for (let i = 1; i <= totalPages; i++) {
