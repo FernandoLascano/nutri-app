@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import {
   ResponsiveContainer,
   LineChart,
@@ -67,6 +69,7 @@ type MealEntry = {
   fat: number
   fiber: number
   note: string
+  offDiet?: boolean
 }
 
 type Goals = {
@@ -1503,7 +1506,8 @@ const App = () => {
     category: 'Gimnasio' as ActivityCategory,
     minutes: 30,
     intensity: 'Moderada' as ActivityEntry['intensity'],
-    time: formatTimeInput(new Date())
+    time: formatTimeInput(new Date()),
+    date: formatDateKey(new Date())
   })
   const [weightForm, setWeightForm] = useState({
     weight: 0,
@@ -1530,6 +1534,11 @@ const App = () => {
   const [isLoadingChat, setIsLoadingChat] = useState(false)
   const [fastingTime, setFastingTime] = useState(() => getFastingStatus(defaultFastingProtocol))
   const [stepsInput, setStepsInput] = useState('')
+  const [pdfDateFrom, setPdfDateFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7); return formatDateKey(d)
+  })
+  const [pdfDateTo, setPdfDateTo] = useState(() => formatDateKey(new Date()))
+  const [showPdfExport, setShowPdfExport] = useState(false)
   const [aiMotivational, setAiMotivational] = useState<{ daily: string; context: string; date: string } | null>(null)
   const [aiMotivationalLoading, setAiMotivationalLoading] = useState(false)
   const [authUser, setAuthUser] = useState<User | null>(null)
@@ -2300,7 +2309,7 @@ const App = () => {
       minutes: activityForm.minutes,
       intensity: activityForm.intensity,
       time: activityForm.time,
-      date: formatDateKey(new Date())
+      date: activityForm.date
     }
     setState((prev) => ({
       ...prev,
@@ -2311,9 +2320,341 @@ const App = () => {
       name: '',
       minutes: 30,
       intensity: 'Moderada',
-      time: formatTimeInput(new Date())
+      time: formatTimeInput(new Date()),
+      date: formatDateKey(new Date())
     }))
     setToast({ id: randomId(), message: '¡Actividad registrada! 💪' })
+  }
+
+  const handleExportPdf = () => {
+    const from = pdfDateFrom
+    const to = pdfDateTo
+    if (from > to) { setToast({ id: randomId(), message: 'La fecha desde no puede ser mayor a la fecha hasta' }); return }
+
+    const meals = state.meals.filter(m => m.date >= from && m.date <= to).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+    const activities = state.activities.filter(a => a.date >= from && a.date <= to).sort((a, b) => a.date.localeCompare(b.date))
+    const weights = state.weightHistory.filter(w => w.date >= from && w.date <= to).sort((a, b) => a.date.localeCompare(b.date))
+    const stepsData = state.dailySteps.filter(s => s.date >= from && s.date <= to)
+
+    const mealsByDay: Record<string, MealEntry[]> = {}
+    meals.forEach(m => { if (!mealsByDay[m.date]) mealsByDay[m.date] = []; mealsByDay[m.date].push(m) })
+    const dates = Object.keys(mealsByDay).sort()
+
+    // Colors
+    const sage = [92, 138, 107] as const
+    const coral = [255, 106, 58] as const
+    const soil = [176, 127, 76] as const
+    const darkText = [40, 50, 45] as const
+    const lightBg = [248, 252, 249] as const
+    const white = [255, 255, 255] as const
+
+    const doc = new jsPDF()
+    const pageW = doc.internal.pageSize.getWidth()
+    let y = 15
+
+    const getY = () => (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+    const checkPage = (needed: number) => { if (y + needed > 275) { doc.addPage(); y = 20 } }
+
+    const drawSectionHeader = (title: string, color: readonly [number, number, number] = sage) => {
+      checkPage(25)
+      doc.setFillColor(color[0], color[1], color[2])
+      doc.roundedRect(14, y - 4, pageW - 28, 10, 2, 2, 'F')
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255)
+      doc.text(title, 18, y + 2.5)
+      doc.setTextColor(darkText[0], darkText[1], darkText[2])
+      y += 12
+    }
+
+    // ===== HEADER =====
+    doc.setFillColor(sage[0], sage[1], sage[2])
+    doc.rect(0, 0, pageW, 42, 'F')
+
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text('NutriAura', pageW / 2, 16, { align: 'center' })
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Reporte Nutricional', pageW / 2, 23, { align: 'center' })
+
+    doc.setFontSize(9)
+    const fromDisplay = new Date(from + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+    const toDisplay = new Date(to + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+    doc.text(`${fromDisplay}  —  ${toDisplay}`, pageW / 2, 30, { align: 'center' })
+
+    doc.setFontSize(8)
+    doc.text(`Generado el ${new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}`, pageW / 2, 37, { align: 'center' })
+
+    doc.setTextColor(darkText[0], darkText[1], darkText[2])
+    y = 52
+
+    // ===== PATIENT INFO =====
+    drawSectionHeader('Datos del paciente')
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+
+    const infoData = [
+      ['Paciente', state.profile.name],
+      ['Sexo / Edad', `${state.profile.sex} · ${state.profile.age} años`],
+      ['Altura', `${state.profile.height} cm`],
+      ['Peso actual', `${state.profile.weight} kg`],
+      ['Peso objetivo', `${state.profile.goalWeight} kg`],
+      ['Nivel de actividad', state.profile.activity],
+      ['Modo nutricional', state.goals.mode],
+      ['Objetivo calórico', `${state.goals.caloriesTarget} kcal/día`],
+      ['Protocolo IF', `${state.fastingProtocol.method} (${state.fastingProtocol.eatingWindowStart} - ${state.fastingProtocol.eatingWindowEnd})`],
+      ['Macros objetivo', `P: ${state.goals.proteinTarget}g · C: ${state.goals.carbsTarget}g · G: ${state.goals.fatTarget}g`]
+    ]
+
+    autoTable(doc, {
+      startY: y,
+      body: infoData,
+      theme: 'plain',
+      styles: { fontSize: 8.5, cellPadding: { top: 2, bottom: 2, left: 4, right: 4 } },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 42, textColor: [sage[0], sage[1], sage[2]] },
+        1: { textColor: [darkText[0], darkText[1], darkText[2]] }
+      },
+      alternateRowStyles: { fillColor: [lightBg[0], lightBg[1], lightBg[2]] }
+    })
+    y = getY() + 10
+
+    // ===== QUICK STATS =====
+    if (dates.length > 0) {
+      drawSectionHeader('Resumen del periodo', coral)
+      const totalCal = meals.reduce((s, m) => s + m.calories, 0)
+      const totalProt = meals.reduce((s, m) => s + m.protein, 0)
+      const n = dates.length
+      const offDietTotal = meals.filter(m => m.offDiet).length
+      const totalActMin = activities.reduce((s, a) => s + a.minutes, 0)
+      const avgSteps = stepsData.length > 0 ? Math.round(stepsData.reduce((s, d) => s + d.steps, 0) / stepsData.length) : 0
+
+      const statsData = [
+        ['Días registrados', `${n}`, 'Total comidas', `${meals.length}`],
+        ['Promedio kcal/día', `${Math.round(totalCal / n)}`, 'Prom. proteínas/día', `${Math.round(totalProt / n)}g`],
+        ['Comidas fuera de dieta', `${offDietTotal}`, '% adherencia', `${Math.round(((meals.length - offDietTotal) / Math.max(1, meals.length)) * 100)}%`],
+        ['Sesiones de ejercicio', `${activities.length}`, 'Total minutos', `${totalActMin}`],
+        ['Promedio pasos/día', avgSteps > 0 ? avgSteps.toLocaleString() : 'Sin datos', 'Pesajes registrados', `${weights.length}`]
+      ]
+
+      autoTable(doc, {
+        startY: y,
+        body: statsData,
+        theme: 'plain',
+        styles: { fontSize: 8.5, cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 4 } },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 42, textColor: [coral[0], coral[1], coral[2]] },
+          1: { cellWidth: 35 },
+          2: { fontStyle: 'bold', cellWidth: 42, textColor: [coral[0], coral[1], coral[2]] },
+          3: { cellWidth: 35 }
+        },
+        alternateRowStyles: { fillColor: [255, 248, 245] }
+      })
+      y = getY() + 10
+    }
+
+    // ===== DAILY SUMMARY TABLE =====
+    drawSectionHeader('Detalle por día')
+
+    const dailySummaryRows = dates.map(date => {
+      const dayMeals = mealsByDay[date]
+      const totals = dayMeals.reduce((acc, m) => ({
+        cal: acc.cal + m.calories, prot: acc.prot + m.protein,
+        carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat, fiber: acc.fiber + m.fiber
+      }), { cal: 0, prot: 0, carbs: 0, fat: 0, fiber: 0 })
+      const offDietCount = dayMeals.filter(m => m.offDiet).length
+      const daySteps = stepsData.find(s => s.date === date)?.steps ?? '-'
+      const dayActs = activities.filter(a => a.date === date)
+      const actMin = dayActs.reduce((acc, a) => acc + a.minutes, 0)
+      const calPct = Math.round((totals.cal / state.goals.caloriesTarget) * 100)
+      return [
+        new Date(date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+        dayMeals.length.toString(),
+        totals.cal.toString(),
+        `${calPct}%`,
+        `${totals.prot}`,
+        `${totals.carbs}`,
+        `${totals.fat}`,
+        offDietCount > 0 ? `${offDietCount}` : '-',
+        actMin > 0 ? `${actMin}m` : '-',
+        daySteps.toString()
+      ]
+    })
+
+    if (dates.length > 0) {
+      const avgT = dates.reduce((acc, date) => {
+        const dm = mealsByDay[date]
+        return { cal: acc.cal + dm.reduce((s, m) => s + m.calories, 0), prot: acc.prot + dm.reduce((s, m) => s + m.protein, 0), carbs: acc.carbs + dm.reduce((s, m) => s + m.carbs, 0), fat: acc.fat + dm.reduce((s, m) => s + m.fat, 0) }
+      }, { cal: 0, prot: 0, carbs: 0, fat: 0 })
+      const n = dates.length
+      dailySummaryRows.push([
+        'PROMEDIO', '-', Math.round(avgT.cal / n).toString(), `${Math.round((avgT.cal / n / state.goals.caloriesTarget) * 100)}%`,
+        Math.round(avgT.prot / n).toString(), Math.round(avgT.carbs / n).toString(), Math.round(avgT.fat / n).toString(), '-', '-', '-'
+      ])
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Fecha', '#', 'Kcal', '%Obj', 'P(g)', 'C(g)', 'G(g)', 'F.Dieta', 'Ejerc.', 'Pasos']],
+      body: dailySummaryRows,
+      styles: { fontSize: 7.5, cellPadding: 2, halign: 'center' },
+      headStyles: { fillColor: [sage[0], sage[1], sage[2]], textColor: [white[0], white[1], white[2]], fontSize: 7.5 },
+      columnStyles: { 0: { halign: 'left', cellWidth: 24 } },
+      alternateRowStyles: { fillColor: [lightBg[0], lightBg[1], lightBg[2]] },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.row.index === dailySummaryRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold'
+          data.cell.styles.fillColor = [sage[0], sage[1], sage[2]]
+          data.cell.styles.textColor = [255, 255, 255]
+        }
+        if (data.section === 'body' && data.column.index === 7) {
+          const val = dailySummaryRows[data.row.index]?.[7]
+          if (val && val !== '-') {
+            data.cell.styles.textColor = [220, 50, 50]
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
+      }
+    })
+    y = getY() + 10
+
+    // ===== DETAILED MEALS =====
+    drawSectionHeader('Detalle de comidas')
+
+    const mealRows = meals.map(m => [
+      new Date(m.date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }),
+      m.time,
+      m.mealType,
+      m.name + (m.offDiet ? '  *' : ''),
+      m.calories.toString(),
+      `${m.protein}`,
+      `${m.carbs}`,
+      `${m.fat}`,
+      m.note || ''
+    ])
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Fecha', 'Hora', 'Tipo', 'Comida', 'Kcal', 'P', 'C', 'G', 'Nota']],
+      body: mealRows,
+      styles: { fontSize: 7, cellPadding: 1.8, halign: 'center' },
+      headStyles: { fillColor: [sage[0], sage[1], sage[2]], textColor: [white[0], white[1], white[2]], fontSize: 7.5 },
+      columnStyles: { 2: { halign: 'left', cellWidth: 18 }, 3: { halign: 'left', cellWidth: 42 }, 8: { halign: 'left', cellWidth: 24 } },
+      alternateRowStyles: { fillColor: [lightBg[0], lightBg[1], lightBg[2]] },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const meal = meals[data.row.index]
+          if (meal?.offDiet) {
+            data.cell.styles.textColor = [220, 50, 50]
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
+      }
+    })
+    y = getY() + 10
+
+    // ===== ACTIVITIES =====
+    if (activities.length > 0) {
+      drawSectionHeader('Actividad física', soil)
+
+      const actRows = activities.map(a => [
+        new Date(a.date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+        a.time,
+        a.category,
+        a.name,
+        `${a.minutes} min`,
+        a.intensity
+      ])
+      const totalActMin = activities.reduce((acc, a) => acc + a.minutes, 0)
+      const actDays = new Set(activities.map(a => a.date)).size
+      actRows.push(['TOTAL', '', `${activities.length} ses.`, '', `${totalActMin} min`, `${actDays} días`])
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Fecha', 'Hora', 'Categoría', 'Detalle', 'Duración', 'Intensidad']],
+        body: actRows,
+        styles: { fontSize: 7.5, cellPadding: 2, halign: 'center' },
+        headStyles: { fillColor: [soil[0], soil[1], soil[2]], textColor: [white[0], white[1], white[2]], fontSize: 7.5 },
+        columnStyles: { 0: { halign: 'left', cellWidth: 28 }, 3: { halign: 'left' } },
+        alternateRowStyles: { fillColor: [255, 250, 242] },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.row.index === actRows.length - 1) {
+            data.cell.styles.fontStyle = 'bold'
+            data.cell.styles.fillColor = [soil[0], soil[1], soil[2]]
+            data.cell.styles.textColor = [255, 255, 255]
+          }
+        }
+      })
+      y = getY() + 10
+    }
+
+    // ===== WEIGHT =====
+    if (weights.length > 0) {
+      drawSectionHeader('Evolución de peso')
+      const weightRows = weights.map(w => {
+        const diff = weights.indexOf(w) > 0 ? (w.weight - weights[weights.indexOf(w) - 1].weight).toFixed(1) : '-'
+        return [
+          new Date(w.date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'long' }),
+          `${w.weight} kg`,
+          diff !== '-' ? `${Number(diff) > 0 ? '+' : ''}${diff} kg` : '-',
+          w.note || ''
+        ]
+      })
+      autoTable(doc, {
+        startY: y,
+        head: [['Fecha', 'Peso', 'Variación', 'Nota']],
+        body: weightRows,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: [sage[0], sage[1], sage[2]], textColor: [white[0], white[1], white[2]], fontSize: 8 },
+        alternateRowStyles: { fillColor: [lightBg[0], lightBg[1], lightBg[2]] },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 2) {
+            const val = weightRows[data.row.index]?.[2]
+            if (val && val !== '-') {
+              data.cell.styles.textColor = val.startsWith('+') ? [220, 50, 50] : [40, 150, 80]
+            }
+          }
+        }
+      })
+      y = getY() + 10
+    }
+
+    // ===== OFF-DIET SUMMARY =====
+    const offDietMeals = meals.filter(m => m.offDiet)
+    if (offDietMeals.length > 0) {
+      drawSectionHeader(`Comidas fuera de dieta (${offDietMeals.length})`, [200, 60, 60] as unknown as readonly [number, number, number])
+      const offRows = offDietMeals.map(m => [
+        new Date(m.date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+        m.mealType, m.name, `${m.calories} kcal`, m.note || ''
+      ])
+      autoTable(doc, {
+        startY: y,
+        head: [['Fecha', 'Tipo', 'Comida', 'Calorías', 'Nota']],
+        body: offRows,
+        styles: { fontSize: 7.5, cellPadding: 2 },
+        headStyles: { fillColor: [200, 60, 60], textColor: [white[0], white[1], white[2]], fontSize: 8 },
+        alternateRowStyles: { fillColor: [255, 245, 245] }
+      })
+      y = getY() + 10
+    }
+
+    // ===== FOOTER on every page =====
+    const totalPages = doc.getNumberOfPages()
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i)
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(150, 160, 155)
+      doc.text('NutriAura — Reporte generado automáticamente', 14, 290)
+      doc.text(`Página ${i} de ${totalPages}`, pageW - 14, 290, { align: 'right' })
+    }
+
+    doc.save(`NutriAura_Reporte_${from}_${to}.pdf`)
+    setToast({ id: randomId(), message: 'PDF exportado correctamente' })
+    setShowPdfExport(false)
   }
 
   const handleAutoGoals = () => {
@@ -3659,7 +4000,7 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                       </button>
                     ))}
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-4">
                     <div>
                       <label className="mb-1 block text-xs text-sage-500">Detalle</label>
                       <input
@@ -3681,6 +4022,15 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                           setActivityForm((prev) => ({ ...prev, minutes: Number(event.target.value) }))
                         }
                         placeholder="30"
+                        className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-sage-500">Fecha</label>
+                      <input
+                        type="date"
+                        value={activityForm.date}
+                        onChange={(event) => setActivityForm((prev) => ({ ...prev, date: event.target.value }))}
                         className="w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-xs shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-950/70"
                       />
                     </div>
@@ -3830,10 +4180,17 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                       {recentMeals.map((meal) => (
                         <div
                           key={meal.id}
-                          className="flex items-center justify-between rounded-2xl border border-sage-100 bg-white/80 px-4 py-3 text-sm shadow-soft dark:border-sage-800 dark:bg-sage-900/80"
+                          className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm shadow-soft ${
+                            meal.offDiet
+                              ? 'border-red-200 bg-red-50/80 dark:border-red-800 dark:bg-red-950/30'
+                              : 'border-sage-100 bg-white/80 dark:border-sage-800 dark:bg-sage-900/80'
+                          }`}
                         >
                           <div>
-                            <p className="font-medium">{meal.name}</p>
+                            <p className="font-medium">
+                              {meal.offDiet && <span className="mr-1 text-red-500" title="Fuera de dieta">⚠️</span>}
+                              {meal.name}
+                            </p>
                             <p className="text-xs text-sage-500">
                               {meal.mealType} · {meal.time} · {meal.calories} kcal
                             </p>
@@ -5154,9 +5511,18 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                   ) : (
                     <div className="mt-2 space-y-2">
                       {filteredSelectedDateMeals.map((meal) => (
-                        <div key={meal.id} className="flex items-center justify-between text-xs">
-                          <span>{meal.time} - {meal.name}</span>
-                          <span className="text-sage-500">{meal.calories} kcal</span>
+                        <div key={meal.id} className={`flex items-center justify-between text-xs ${meal.offDiet ? 'text-red-500' : ''}`}>
+                          <span>{meal.offDiet ? '⚠️ ' : ''}{meal.time} - {meal.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sage-500">{meal.calories} kcal</span>
+                            <button
+                              onClick={() => setEditingMeal(meal)}
+                              className="text-sage-400 hover:text-sage-600"
+                              title="Editar"
+                            >
+                              ✏️
+                            </button>
+                          </div>
                         </div>
                       ))}
                       <div className="mt-2 border-t border-sage-200 pt-2 dark:border-sage-700">
@@ -5209,10 +5575,17 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                     {historyMeals.slice(0, 15).map((meal) => (
                       <div
                         key={meal.id}
-                        className="flex items-center justify-between rounded-2xl border border-sage-100 bg-white/80 px-4 py-2 text-sm shadow-soft dark:border-sage-800 dark:bg-sage-900/80"
+                        className={`flex items-center justify-between rounded-2xl border px-4 py-2 text-sm shadow-soft ${
+                          meal.offDiet
+                            ? 'border-red-200 bg-red-50/80 dark:border-red-800 dark:bg-red-950/30'
+                            : 'border-sage-100 bg-white/80 dark:border-sage-800 dark:bg-sage-900/80'
+                        }`}
                       >
                         <div className="flex-1">
-                          <p className="font-medium text-sage-800 dark:text-sage-100">{meal.name}</p>
+                          <p className="font-medium text-sage-800 dark:text-sage-100">
+                            {meal.offDiet && <span className="mr-1 text-red-500">⚠️</span>}
+                            {meal.name}
+                          </p>
                           <p className="text-xs text-sage-500 capitalize">
                             {formatDateDisplay(meal.date)} · {meal.mealType} · {meal.time}
                           </p>
@@ -5240,6 +5613,58 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                       </div>
                     ))}
                   </div>
+                </div>
+                {/* PDF Export */}
+                <div className={`${cardBase} p-6`}>
+                  <h3 className="font-display text-lg font-semibold">
+                    <SectionTitle icon={<IconChart />} text="Exportar reporte PDF" />
+                  </h3>
+                  <p className="mt-1 text-xs text-sage-500">Generá un PDF completo para mostrarle a tu nutricionista.</p>
+                  {!showPdfExport ? (
+                    <button
+                      onClick={() => setShowPdfExport(true)}
+                      className="mt-3 w-full rounded-2xl bg-coral-500 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-coral-600"
+                    >
+                      Exportar PDF
+                    </button>
+                  ) : (
+                    <div className="mt-3 grid gap-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-sage-500">Desde</label>
+                          <input
+                            type="date"
+                            value={pdfDateFrom}
+                            onChange={(e) => setPdfDateFrom(e.target.value)}
+                            className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-sage-500">Hasta</label>
+                          <input
+                            type="date"
+                            value={pdfDateTo}
+                            onChange={(e) => setPdfDateTo(e.target.value)}
+                            className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-3 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowPdfExport(false)}
+                          className="flex-1 rounded-2xl border border-sage-200 px-4 py-2.5 text-sm font-semibold text-sage-600 hover:bg-sage-50 dark:border-sage-700 dark:text-sage-300"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleExportPdf}
+                          className="flex-1 rounded-2xl bg-coral-500 px-4 py-2.5 text-sm font-semibold text-white shadow-soft hover:bg-coral-600"
+                        >
+                          Generar PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.section>
@@ -5882,6 +6307,18 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                     className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingMeal({ ...editingMeal, offDiet: !editingMeal.offDiet })}
+                  className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                    editingMeal.offDiet
+                      ? 'border-red-300 bg-red-50 text-red-600 dark:border-red-700 dark:bg-red-950/30 dark:text-red-400'
+                      : 'border-sage-200 bg-white/80 text-sage-500 dark:border-sage-700 dark:bg-sage-800 dark:text-sage-400'
+                  }`}
+                >
+                  <span>{editingMeal.offDiet ? '⚠️' : '✅'}</span>
+                  {editingMeal.offDiet ? 'Marcada como fuera de dieta' : 'Dentro de la dieta'}
+                </button>
               </div>
               <div className="mt-6 flex gap-2">
                 <button
@@ -5952,7 +6389,27 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-sage-500">Fecha</label>
+                    <input
+                      type="date"
+                      value={editingActivity.date}
+                      onChange={(e) => setEditingActivity({ ...editingActivity, date: e.target.value })}
+                      className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-sage-500">Hora</label>
+                    <input
+                      type="time"
+                      value={editingActivity.time}
+                      onChange={(e) => setEditingActivity({ ...editingActivity, time: e.target.value })}
+                      className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-sage-500">Minutos</label>
                     <input
@@ -5973,15 +6430,6 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                       <option value="Moderada">Moderada</option>
                       <option value="Alta">Alta</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-sage-500">Hora</label>
-                    <input
-                      type="time"
-                      value={editingActivity.time}
-                      onChange={(e) => setEditingActivity({ ...editingActivity, time: e.target.value })}
-                      className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-800"
-                    />
                   </div>
                 </div>
               </div>
