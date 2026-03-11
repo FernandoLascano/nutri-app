@@ -4588,6 +4588,57 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                   )}
                 </div>
               </div>
+
+              {/* Sync status */}
+              <div className={`${cardBase} p-6`}>
+                <h3 className="font-display text-lg font-semibold text-sage-700 dark:text-sage-200">
+                  Estado de sincronización
+                </h3>
+                <p className="mt-1 text-xs text-sage-500 dark:text-sage-400">
+                  Cómo se está guardando tu estado entre dispositivos.
+                </p>
+                <div className="mt-3 space-y-1 text-xs text-sage-600 dark:text-sage-300">
+                  <p>
+                    <span className="font-semibold">Última carga: </span>
+                    {syncStatus.lastLoad
+                      ? `${syncStatus.lastLoad.ok ? 'OK' : 'Error'} desde ${syncStatus.lastLoad.source} · ${
+                          new Date(syncStatus.lastLoad.time).toLocaleString('es-AR')
+                        }`
+                      : 'Sin datos en esta sesión.'}
+                  </p>
+                  {syncStatus.lastLoad?.message && (
+                    <p className="text-[11px] text-coral-500 dark:text-coral-300">
+                      Detalle: {syncStatus.lastLoad.message}
+                    </p>
+                  )}
+                  <p className="mt-2">
+                    <span className="font-semibold">Último guardado: </span>
+                    {syncStatus.lastSave
+                      ? `${syncStatus.lastSave.ok ? 'OK' : 'Error'} en ${syncStatus.lastSave.source} · ${
+                          new Date(syncStatus.lastSave.time).toLocaleString('es-AR')
+                        }`
+                      : 'Aún no se registró en esta sesión.'}
+                  </p>
+                  {syncStatus.lastSave?.message && (
+                    <p className="text-[11px] text-coral-500 dark:text-coral-300">
+                      Detalle: {syncStatus.lastSave.message}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleForceSyncNow}
+                  disabled={!authUser}
+                  className="mt-3 rounded-full border border-sage-200 bg-white/80 px-4 py-2 text-xs font-semibold text-sage-600 shadow-soft hover:bg-sage-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-200 dark:hover:bg-sage-800"
+                >
+                  Forzar sync ahora
+                </button>
+                {!authUser && (
+                  <p className="mt-1 text-[11px] text-sage-400">
+                    Iniciá sesión para sincronizar con Supabase.
+                  </p>
+                )}
+              </div>
             </motion.section>
           )}
 
@@ -5155,56 +5206,6 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                   </div>
                 </div>
 
-                {/* Sync status */}
-                <div className={`${cardBase} p-6`}>
-                  <h3 className="font-display text-lg font-semibold text-sage-700 dark:text-sage-200">
-                    Estado de sincronización
-                  </h3>
-                  <p className="mt-1 text-xs text-sage-500 dark:text-sage-400">
-                    Cómo se está guardando tu estado entre dispositivos.
-                  </p>
-                  <div className="mt-3 space-y-1 text-xs text-sage-600 dark:text-sage-300">
-                    <p>
-                      <span className="font-semibold">Última carga: </span>
-                      {syncStatus.lastLoad
-                        ? `${syncStatus.lastLoad.ok ? 'OK' : 'Error'} desde ${syncStatus.lastLoad.source} · ${
-                            new Date(syncStatus.lastLoad.time).toLocaleString('es-AR')
-                          }`
-                        : 'Sin datos en esta sesión.'}
-                    </p>
-                    {syncStatus.lastLoad?.message && (
-                      <p className="text-[11px] text-coral-500 dark:text-coral-300">
-                        Detalle: {syncStatus.lastLoad.message}
-                      </p>
-                    )}
-                    <p className="mt-2">
-                      <span className="font-semibold">Último guardado: </span>
-                      {syncStatus.lastSave
-                        ? `${syncStatus.lastSave.ok ? 'OK' : 'Error'} en ${syncStatus.lastSave.source} · ${
-                            new Date(syncStatus.lastSave.time).toLocaleString('es-AR')
-                          }`
-                        : 'Aún no se registró en esta sesión.'}
-                    </p>
-                    {syncStatus.lastSave?.message && (
-                      <p className="text-[11px] text-coral-500 dark:text-coral-300">
-                        Detalle: {syncStatus.lastSave.message}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleForceSyncNow}
-                    disabled={!authUser}
-                    className="mt-3 rounded-full border border-sage-200 bg-white/80 px-4 py-2 text-xs font-semibold text-sage-600 shadow-soft hover:bg-sage-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-200 dark:hover:bg-sage-800"
-                  >
-                    Forzar sync ahora
-                  </button>
-                  {!authUser && (
-                    <p className="mt-1 text-[11px] text-sage-400">
-                      Iniciá sesión para sincronizar con Supabase.
-                    </p>
-                  )}
-                </div>
               </div>
               <div className={`${cardBase} p-6`}>
                 <h3 className="font-display text-lg font-semibold">
