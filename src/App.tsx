@@ -173,6 +173,18 @@ type AppState = {
   weddingDate: string
 }
 
+type SyncInfo = {
+  ok: boolean
+  source: 'supabase' | 'local' | 'api'
+  time: string
+  message?: string
+}
+
+type SyncStatus = {
+  lastLoad?: SyncInfo
+  lastSave?: SyncInfo
+}
+
 type OpenAIEstimate = {
   calories: number
   protein: number
@@ -996,7 +1008,7 @@ const loadState = (): AppState => {
 const saveState = (
   state: AppState,
   userId?: string,
-  options?: { onError?: (message: string) => void; skipSupabase?: boolean }
+  options?: { onError?: (message: string) => void; skipSupabase?: boolean; onSuccess?: () => void }
 ) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   if (options?.skipSupabase) return
@@ -1013,6 +1025,8 @@ const saveState = (
           options?.onError?.(
             'No se pudo guardar en la nube. En Supabase, ejecutá la migración de la tabla app_state_users.'
           )
+        } else {
+          options?.onSuccess?.()
         }
       }, () => {
         options?.onError?.(
@@ -1026,13 +1040,26 @@ const saveState = (
         { id: 'default', state, updated_at: new Date().toISOString() },
         { onConflict: 'id' }
       )
-      .then(() => {}, () => {})
+      .then(() => {
+        options?.onSuccess?.()
+      }, () => {
+        options?.onError?.(
+          'No se pudo guardar el estado por defecto en la nube.'
+        )
+      })
   } else {
     fetch(`${API_BASE}/api/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state)
-    }).then(() => {}, () => {})
+    }).then(
+      () => {
+        options?.onSuccess?.()
+      },
+      () => {
+        options?.onError?.('No se pudo guardar en la API remota.')
+      }
+    )
   }
 }
 
@@ -1475,6 +1502,7 @@ const App = () => {
     }
   }, [lastFilledGlass])
   const [toast, setToast] = useState<Toast | null>(null)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({})
   const [librarySearch, setLibrarySearch] = useState('')
   const [libraryCategory, setLibraryCategory] = useState<FoodCategory | 'Todas'>('Todas')
   const [libraryExpanded, setLibraryExpanded] = useState(false)
@@ -1693,6 +1721,15 @@ const App = () => {
           .single()
           .then(({ data, error }) => {
             if (error && error.code !== 'PGRST116') {
+              setSyncStatus((prev) => ({
+                ...prev,
+                lastLoad: {
+                  ok: false,
+                  source: 'supabase',
+                  time: new Date().toISOString(),
+                  message: error.message
+                }
+              }))
               setToast({
                 id: randomId(),
                 message:
@@ -1709,7 +1746,26 @@ const App = () => {
                 } catch { /* ignore */ }
               }
             }
+            if (!error) {
+              setSyncStatus((prev) => ({
+                ...prev,
+                lastLoad: {
+                  ok: true,
+                  source: 'supabase',
+                  time: new Date().toISOString()
+                }
+              }))
+            }
           }, () => {
+            setSyncStatus((prev) => ({
+              ...prev,
+              lastLoad: {
+                ok: false,
+                source: 'supabase',
+                time: new Date().toISOString(),
+                message: 'Error de red al conectar con Supabase.'
+              }
+            }))
             setToast({
               id: randomId(),
               message:
@@ -1732,15 +1788,63 @@ const App = () => {
       fetch(`${API_BASE}/api/state`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (data && typeof data === 'object') setState(mergeParsedState(data as Partial<AppState>))
-        }, () => {})
+          if (data && typeof data === 'object') {
+            setState(mergeParsedState(data as Partial<AppState>))
+            setSyncStatus((prev) => ({
+              ...prev,
+              lastLoad: {
+                ok: true,
+                source: 'api',
+                time: new Date().toISOString()
+              }
+            }))
+          }
+        }, () => {
+          setSyncStatus((prev) => ({
+            ...prev,
+            lastLoad: {
+              ok: false,
+              source: 'api',
+              time: new Date().toISOString(),
+              message: 'No se pudo cargar desde la API remota.'
+            }
+          }))
+        })
     }
   }, [authUser, refreshTrigger])
 
   useEffect(() => {
     const skipSupabase = !!authUser && !initialLoadDoneRef.current
     saveState(state, authUser?.id, {
-      onError: (msg) => setToast({ id: randomId(), message: msg }),
+      onError: (msg) => {
+        setToast({ id: randomId(), message: msg })
+        const now = new Date().toISOString()
+        const source: SyncInfo['source'] =
+          authUser && getSupabase() ? 'supabase' : getSupabase() ? 'supabase' : 'api'
+        setSyncStatus((prev) => ({
+          ...prev,
+          lastSave: {
+            ok: false,
+            source,
+            time: now,
+            message: msg
+          }
+        }))
+      },
+      onSuccess: () => {
+        if (skipSupabase && authUser) return
+        const now = new Date().toISOString()
+        const source: SyncInfo['source'] =
+          authUser && getSupabase() ? 'supabase' : getSupabase() ? 'supabase' : 'api'
+        setSyncStatus((prev) => ({
+          ...prev,
+          lastSave: {
+            ok: true,
+            source,
+            time: now
+          }
+        }))
+      },
       skipSupabase
     })
     document.documentElement.classList.toggle('dark', state.theme === 'dark')
@@ -2045,6 +2149,39 @@ const App = () => {
       setShowCelebration(true)
     }
   }, [todayKey, mentorChecklist.completedCount, mentorChecklist.total])
+
+  const handleForceSyncNow = () => {
+    const supabase = getSupabase()
+    const hasSupabase = Boolean(supabase && authUser)
+    saveState(state, authUser?.id, {
+      onError: (msg) => {
+        setToast({ id: randomId(), message: msg })
+        const now = new Date().toISOString()
+        setSyncStatus((prev) => ({
+          ...prev,
+          lastSave: {
+            ok: false,
+            source: hasSupabase ? 'supabase' : 'api',
+            time: now,
+            message: msg
+          }
+        }))
+      },
+      onSuccess: () => {
+        const now = new Date().toISOString()
+        setSyncStatus((prev) => ({
+          ...prev,
+          lastSave: {
+            ok: true,
+            source: hasSupabase ? 'supabase' : 'api',
+            time: now,
+          }
+        }))
+        setToast({ id: randomId(), message: 'Sincronización con la nube completada.' })
+      },
+      skipSupabase: false
+    })
+  }
 
   const selectedDateMeals = useMemo(() => {
     const key = formatDateKey(selectedDate)
@@ -5016,6 +5153,57 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                         ))
                     )}
                   </div>
+                </div>
+
+                {/* Sync status */}
+                <div className={`${cardBase} p-6`}>
+                  <h3 className="font-display text-lg font-semibold text-sage-700 dark:text-sage-200">
+                    Estado de sincronización
+                  </h3>
+                  <p className="mt-1 text-xs text-sage-500 dark:text-sage-400">
+                    Cómo se está guardando tu estado entre dispositivos.
+                  </p>
+                  <div className="mt-3 space-y-1 text-xs text-sage-600 dark:text-sage-300">
+                    <p>
+                      <span className="font-semibold">Última carga: </span>
+                      {syncStatus.lastLoad
+                        ? `${syncStatus.lastLoad.ok ? 'OK' : 'Error'} desde ${syncStatus.lastLoad.source} · ${
+                            new Date(syncStatus.lastLoad.time).toLocaleString('es-AR')
+                          }`
+                        : 'Sin datos en esta sesión.'}
+                    </p>
+                    {syncStatus.lastLoad?.message && (
+                      <p className="text-[11px] text-coral-500 dark:text-coral-300">
+                        Detalle: {syncStatus.lastLoad.message}
+                      </p>
+                    )}
+                    <p className="mt-2">
+                      <span className="font-semibold">Último guardado: </span>
+                      {syncStatus.lastSave
+                        ? `${syncStatus.lastSave.ok ? 'OK' : 'Error'} en ${syncStatus.lastSave.source} · ${
+                            new Date(syncStatus.lastSave.time).toLocaleString('es-AR')
+                          }`
+                        : 'Aún no se registró en esta sesión.'}
+                    </p>
+                    {syncStatus.lastSave?.message && (
+                      <p className="text-[11px] text-coral-500 dark:text-coral-300">
+                        Detalle: {syncStatus.lastSave.message}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleForceSyncNow}
+                    disabled={!authUser}
+                    className="mt-3 rounded-full border border-sage-200 bg-white/80 px-4 py-2 text-xs font-semibold text-sage-600 shadow-soft hover:bg-sage-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sage-700 dark:bg-sage-900/80 dark:text-sage-200 dark:hover:bg-sage-800"
+                  >
+                    Forzar sync ahora
+                  </button>
+                  {!authUser && (
+                    <p className="mt-1 text-[11px] text-sage-400">
+                      Iniciá sesión para sincronizar con Supabase.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className={`${cardBase} p-6`}>
