@@ -1550,7 +1550,8 @@ const App = () => {
     visceralFat: '' as string | number,
     boneMass: '' as string | number,
     metabolicAge: '' as string | number,
-    note: ''
+    note: '',
+    date: formatDateKey(new Date())
   })
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [calendarMonth, setCalendarMonth] = useState(new Date())
@@ -2992,7 +2993,7 @@ const App = () => {
   const handleAddBodyComp = () => {
     const entry: BodyCompositionEntry = {
       id: randomId(),
-      date: formatDateKey(new Date()),
+      date: bodyCompForm.date || formatDateKey(new Date()),
       fatPercentage: bodyCompForm.fatPercentage === '' ? null : Number(bodyCompForm.fatPercentage),
       muscleMass: bodyCompForm.muscleMass === '' ? null : Number(bodyCompForm.muscleMass),
       waterPercentage: bodyCompForm.waterPercentage === '' ? null : Number(bodyCompForm.waterPercentage),
@@ -3012,7 +3013,8 @@ const App = () => {
       visceralFat: '',
       boneMass: '',
       metabolicAge: '',
-      note: ''
+      note: '',
+      date: formatDateKey(new Date())
     })
     setToast({ id: randomId(), message: 'Composición corporal registrada' })
   }
@@ -5224,6 +5226,15 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                   <SectionTitle icon={<IconBody />} text="Nueva medición" />
                 </h3>
                 <div className="mt-4 grid gap-3">
+                  <div>
+                    <label className="text-xs text-sage-500">Fecha de medición</label>
+                    <input
+                      type="date"
+                      value={bodyCompForm.date}
+                      onChange={(e) => setBodyCompForm((prev) => ({ ...prev, date: e.target.value }))}
+                      className="mt-1 h-[44px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-sage-500">% Grasa corporal</label>
