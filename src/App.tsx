@@ -1540,7 +1540,8 @@ const App = () => {
   })
   const [weightForm, setWeightForm] = useState({
     weight: 0,
-    note: ''
+    note: '',
+    date: formatDateKey(new Date())
   })
   const [bodyCompForm, setBodyCompForm] = useState({
     fatPercentage: '' as string | number,
@@ -2969,7 +2970,7 @@ const App = () => {
     const entry: WeightEntry = {
       id: randomId(),
       weight: weightForm.weight,
-      date: formatDateKey(new Date()),
+      date: weightForm.date || formatDateKey(new Date()),
       note: weightForm.note
     }
     setState((prev) => ({
@@ -2977,7 +2978,7 @@ const App = () => {
       weightHistory: [entry, ...prev.weightHistory],
       profile: { ...prev.profile, weight: weightForm.weight }
     }))
-    setWeightForm({ weight: 0, note: '' })
+    setWeightForm({ weight: 0, note: '', date: formatDateKey(new Date()) })
     setToast({ id: randomId(), message: 'Peso registrado correctamente' })
   }
 
@@ -5076,18 +5077,29 @@ Responde en español, de forma clara y práctica. Si pide lista de super, dala p
                   <SectionTitle icon={<IconScale />} text="Registrar peso" />
                 </h3>
                 <div className="mt-4 grid gap-4">
-                  <div>
-                    <label className="text-xs text-sage-500">Peso (kg)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="30"
-                      max="300"
-                      value={weightForm.weight || ''}
-                      onChange={(e) => setWeightForm((prev) => ({ ...prev, weight: Number(e.target.value) }))}
-                      placeholder="Ej: 75.5"
-                      className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-3 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
-                    />
+                  <div className="grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
+                    <div>
+                      <label className="text-xs text-sage-500">Peso (kg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="30"
+                        max="300"
+                        value={weightForm.weight || ''}
+                        onChange={(e) => setWeightForm((prev) => ({ ...prev, weight: Number(e.target.value) }))}
+                        placeholder="Ej: 75.5"
+                        className="mt-1 w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-3 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-sage-500">Fecha</label>
+                      <input
+                        type="date"
+                        value={weightForm.date}
+                        onChange={(e) => setWeightForm((prev) => ({ ...prev, date: e.target.value }))}
+                        className="mt-1 h-[44px] w-full rounded-2xl border border-sage-200 bg-white/80 px-4 py-2.5 text-sm shadow-soft outline-none focus:border-sage-400 dark:border-sage-700 dark:bg-sage-900/80"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-sage-500">Nota (opcional)</label>
